@@ -1,4 +1,4 @@
-// ===== checkout.js — v10.11.2 (colors via CSS, pixels wired, thank-you redirects) =====
+// ===== checkout.js — v10.11.2+namefix (minimal change, preserves Cash App/Crypto) =====
 (function(){
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
@@ -109,22 +109,35 @@
   window.gotoStep3 = function(){ setStep(3); };
 
   function getStep1Val(n){ return step1?.querySelector(`[name="${n}"]`)?.value?.trim() || ''; }
-  
-function getCustomerMeta(){
-    const fullInput = getStep1Val('full-name') || getStep1Val('name') || getStep1Val('full_name') || '';
-    const f = step1?.querySelector('[name="first_name"]')?.value?.trim() || '';
-    const l = step1?.querySelector('[name="last_name"]')?.value?.trim() || '';
-    let first = f, last = l;
-    if ((!first || !last) && fullInput){
-      const i = fullInput.lastIndexOf(' ');
-      if (i > 0){ if (!first) first = fullInput.slice(0, i).trim(); if (!last) last = fullInput.slice(i+1).trim(); }
-      else { if (!first) first = fullInput.trim(); if (!last) last = fullInput.trim(); } // single word -> duplicate
+
+  // ===== MODIFIED: robust Full Name support (name="full-name" or "name" or split fields)
+  function getCustomerMeta(){
+    const fullRaw = getStep1Val('full-name') || getStep1Val('name') || getStep1Val('full_name') || '';
+    const fIn = getStep1Val('first_name');
+    const lIn = getStep1Val('last_name');
+    let first = fIn, last = lIn;
+    const full = (fullRaw||'').trim();
+    if ((!first || !last) && full){
+      const parts = full.split(/\s+/);
+      if (parts.length > 1){ last = parts.pop(); first = parts.join(' '); }
+      else { if (!first) first = full; if (!last) last = full; }
     }
-    const name = (fullInput || (first + (last ? (' ' + last) : ''))).trim();
-    return { name, first_name:first||'', last_name:last||'', email:getStep1Val('email'), phone:getStep1Val('phone'),
-             address:getStep1Val('address'), city:getStep1Val('city'), state:getStep1Val('state'), zip:getStep1Val('zip'), country:'US' };
+    const name = (full || [first,last].filter(Boolean).join(' ')).trim();
+    return {
+      name, // helps server split if it prefers a single field
+      first_name:first||'',
+      last_name:last||'',
+      email:getStep1Val('email'),
+      phone:getStep1Val('phone'),
+      address:getStep1Val('address'),
+      city:getStep1Val('city'),
+      state:getStep1Val('state'),
+      zip:getStep1Val('zip'),
+      country:'US'
+    };
   }
-function getOrderId(){
+
+  function getOrderId(){
     let id = sessionStorage.getItem('coOrderId');
     if (!id){
       const email = getStep1Val('email') || (navigator.userAgent||'guest');
@@ -184,9 +197,9 @@ function getOrderId(){
       </div>`;
     } else if (payMethod === 'crypto'){
       title = 'Pay with Crypto';
-      body  = 'You\'ll be redirected to Coinbase Commerce to pay with BTC, ETH, USDC, and more.';
+      body  = 'You\\'ll be redirected to Coinbase Commerce to pay with BTC, ETH, USDC, and more.';
       primary = 'Continue to Coinbase'; url = '#';
-      help = 'After the network confirms, we\'ll email you and ship.';
+      help = 'After the network confirms, we\\'ll email you and ship.';
     }
 
     const h4Style = (payMethod === 'cashapp' || payMethod === 'crypto')
@@ -298,13 +311,15 @@ function getOrderId(){
       submit.disabled = true; submit.textContent = 'Processing…';
 
       const customer = getCustomerMeta();
-      const token = await window.RecurlyUI.tokenize({
-        first_name: (customer.first_name || customer.name || '').split(' ').slice(0, -1).join(' ') || customer.first_name || 'Customer',
-        last_name:  (customer.last_name  || customer.name || '').split(' ').slice(-1).join(' ') || customer.last_name  || 'Customer',
-        email: customer.email || undefined
-      });
+
+      // ===== MODIFIED: pass names/emails into tokenization meta for Recurly validation
+      const fn = customer.first_name || (customer.name||'').split(' ').slice(0,-1).join(' ') || customer.name || 'Customer';
+      const ln = customer.last_name  || (customer.name||'').split(' ').slice(-1).join(' ') || customer.name || 'Customer';
+      const token = await window.RecurlyUI.tokenize({ first_name: fn, last_name: ln, email: customer.email || undefined });
+
       const resp = await fetch('/api/payments/recurly/charge', {
         method:'POST', headers:{'Content-Type':'application/json'},
+        // include 'name' along with split fields for server-side convenience
         body: JSON.stringify({ token: token.id || token, customer, items:[{ sku:'tirz-vial', qty, price: PRICE }] })
       });
       let data=null; try{ data=await resp.json(); }catch(_){}
@@ -349,7 +364,7 @@ function getOrderId(){
 
   // ===== save-on-change (Step 1)
   (function(){
-    const fields = ['name','email','phone','address','city','state','zip'];
+    const fields = ['name','full-name','email','phone','address','city','state','zip'];
     function save(){ if(!step1) return; const data={}; fields.forEach(n=> data[n] = step1.querySelector(`[name="${n}"]`)?.value?.trim()||'');
       localStorage.setItem('coStep1', JSON.stringify(data)); }
     function load(){ try{ const d=JSON.parse(localStorage.getItem('coStep1')||'{}');
@@ -372,7 +387,7 @@ function getOrderId(){
   document.getElementById('coSubmit')?.addEventListener('click', ()=>track('co_submit',{ method:'card' }));
 
   // ===== exit guard
-  function isDirtyStep1(){ const names=['name','email','phone','address','city','state','zip'];
+  function isDirtyStep1(){ const names=['name','full-name','email','phone','address','city','state','zip'];
     return names.some(n => (step1?.querySelector(`[name="${n}"]`)?.value||'').trim().length>0); }
   const origClose = window.checkoutClose; window.checkoutClose = function(){ if (isDirtyStep1() && !confirm('Leave checkout? Your info will be saved.')) return; origClose(); };
 
