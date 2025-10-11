@@ -312,10 +312,21 @@
 
       const customer = getCustomerMeta();
 
-      // ===== MODIFIED: pass names/emails into tokenization meta for Recurly validation
-      const fn = customer.first_name || (customer.name||'').split(' ').slice(0,-1).join(' ') || customer.name || 'Customer';
-      const ln = customer.last_name  || (customer.name||'').split(' ').slice(-1).join(' ') || customer.name || 'Customer';
-      const token = await window.RecurlyUI.tokenize({ first_name: fn, last_name: ln, email: customer.email || undefined });
+// ===== MODIFIED: pass names + full billing address into Recurly tokenization
+const fn = customer.first_name || (customer.name||'').split(' ').slice(0,-1).join(' ') || customer.name || 'Customer';
+const ln = customer.last_name  || (customer.name||'').split(' ').slice(-1).join(' ') || customer.name || 'Customer';
+
+const token = await window.RecurlyUI.tokenize({
+  first_name: fn,
+  last_name:  ln,
+  email:       customer.email || undefined,
+  address1:    customer.address || undefined, // REQUIRED by your site settings
+  city:        customer.city    || undefined, // REQUIRED
+  region:      customer.state   || undefined, // state / province
+  postal_code: customer.zip     || undefined, // REQUIRED
+  country:    (customer.country || 'US').toUpperCase() // ISO-2; defaults to US
+});
+
 
       const resp = await fetch('/api/payments/recurly/charge', {
         method:'POST', headers:{'Content-Type':'application/json'},
