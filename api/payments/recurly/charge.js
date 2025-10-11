@@ -1,4 +1,4 @@
-// ===== /api/payments/recurly/charge.js — v2.4 (token + resilient names/items) =====
+// ===== /api/payments/recurly/charge.js — v2.5 (server-only hardening) =====
 const { Client } = require('recurly');
 
 function send(res, status, body){
@@ -7,28 +7,25 @@ function send(res, status, body){
   res.end(JSON.stringify(body));
 }
 
-function safeParseBody(req){
+function safeJson(req){
   if (req.body && typeof req.body === 'object') return req.body;
-  try{
-    return JSON.parse(req.body || '{}');
-  }catch(_){
-    return null;
-  }
+  try { return JSON.parse(req.body || '{}'); } catch(_){ return null; }
+}
+
+function splitNameLike(full){
+  const s = String(full || '').trim();
+  if (!s) return { first: '', last: '' };
+  const parts = s.split(/\s+/);
+  if (parts.length === 1) return { first: parts[0], last: parts[0] };
+  return { first: parts.slice(0, -1).join(' '), last: parts.slice(-1).join(' ') };
 }
 
 function parseError(e){
   let payload = null;
-  try {
-    payload = (e && typeof e.body === 'string') ? JSON.parse(e.body) : (e && e.body) || null;
-  } catch(_) {}
-  const message =
-    (payload && payload.error && payload.error.message) ||
-    e?.message ||
-    'Payment failed';
+  try { payload = (e && typeof e.body === 'string') ? JSON.parse(e.body) : (e && e.body) || null; } catch(_){}
+  const message = (payload && payload.error && payload.error.message) || e?.message || 'Payment failed';
   const params = (payload && payload.error && payload.error.params) || [];
-  const errors = Array.isArray(params)
-    ? params.map(p => p?.param ? `${p.param}: ${p.message}` : p?.message).filter(Boolean)
-    : [];
+  const errors = Array.isArray(params) ? params.map(p => p?.param ? `${p.param}: ${p.message}` : p?.message).filter(Boolean) : [];
   return { status: e?.status || 422, message, errors, raw: payload || e };
 }
 
@@ -40,32 +37,48 @@ module.exports = async (req, res) => {
     }
 
     const apiKey = process.env.RECURLY_API_KEY;
-    if (!apiKey){
-      return send(res, 500, { error: 'Server not configured: missing RECURLY_API_KEY env var' });
-    }
+    if (!apiKey) return send(res, 500, { error: 'Server not configured: missing RECURLY_API_KEY env var' });
 
-    const body = safeParseBody(req);
+    const body = safeJson(req);
     if (!body) return send(res, 400, { error: 'Invalid JSON body' });
 
-    // Accept either { token: '...' } or { token: { id:'...' } }
+    // Accept token as string or object with id
     const token = body?.token?.id || body?.token;
     const customer = body?.customer || {};
-
     if (!token) return send(res, 400, { error: 'Missing card token' });
 
-    // Prefer top-level items, then customer.items, then default
-    const items = (Array.isArray(body.items) && body.items.length)
-      ? body.items
-      : (Array.isArray(customer.items) && customer.items.length)
-        ? customer.items
-        : [{ sku: 'tirz-vial', qty: 1, price: 90 }];
+    // Derive names robustly: use explicit fields or split a full name
+    let firstName = (customer.first_name || '').trim();
+    let lastName  = (customer.last_name  || '').trim();
 
-    // Normalize names & email (gateway requires non-empty first/last)
-    const firstName = (customer.first_name || '').trim() || 'Customer';
-    const lastName  = (customer.last_name  || '').trim() || 'Customer';
-    const email     = (customer.email      || '').trim() || undefined;
+    if (!firstName || !lastName){
+      const full = (customer.name || customer.full_name || customer.cardholder || '').trim();
+      if (full){
+        const s = splitNameLike(full);
+        firstName = firstName || s.first;
+        lastName  = lastName  || s.last;
+      }
+    }
+    if (!firstName) firstName = 'Customer';
+    if (!lastName)  lastName  = 'Customer';
 
-    // Build line items
+    const email = (customer.email || '').trim() || undefined;
+
+    // Build items gracefully:
+    //  - Prefer body.items or customer.items arrays
+    //  - Or accept qty + unit_amount (number) shape
+    //  - Or default single SKU
+    let items = [];
+    if (Array.isArray(body.items) && body.items.length){
+      items = body.items;
+    } else if (Array.isArray(customer.items) && customer.items.length){
+      items = customer.items;
+    } else if (typeof body.qty !== 'undefined' && typeof body.unit_amount !== 'undefined'){
+      items = [{ sku: 'tirz-vial', qty: Number(body.qty) || 1, price: Number(body.unit_amount) || 90 }];
+    } else {
+      items = [{ sku: 'tirz-vial', qty: 1, price: 90 }];
+    }
+
     const lineItems = items.map(it => ({
       type: 'charge',
       currency: 'USD',
@@ -90,7 +103,7 @@ module.exports = async (req, res) => {
       collectionMethod: 'automatic'
     };
 
-    // Validate & charge
+    // Validate + charge
     await client.previewPurchase(purchaseReq);
     const purchase = await client.createPurchase(purchaseReq);
 
