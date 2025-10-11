@@ -1,4 +1,4 @@
-// ===== checkout.js — v10.11.4 (full build + Recurly payload fix) =====
+// ===== checkout.js — v10.11.5 (full + Recurly payload + explicit first/last) =====
 (function(){
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
@@ -34,9 +34,18 @@
     if (g3){ e.preventDefault(); setStep(3); return; }
   }, true);
 
+  // Prevent native submits (keeps modal alive)
   modal.addEventListener('submit', (e)=>{ if (modal.contains(e.target)) e.preventDefault(); }, true);
+
+  // Step 1 -> Step 2
   step1 && step1.addEventListener('submit', (e)=>{
     e.preventDefault();
+    // basic presence checks so we don't advance with blanks
+    const c = getCustomerMeta();
+    if (!c.first_name || !c.last_name || !c.email) {
+      alert('Please enter your first name, last name, and email to continue.');
+      return;
+    }
     setStep(2);
     fbqSafe('InitiateCheckout', pixelCartData({ num_items: qty }));
   }, true);
@@ -46,7 +55,7 @@
   const qtyInput = $('#coQty');
   const elItems = $('#coItems'), elMerch = $('#coMerch'), elMethod = $('#coMethod');
   const elTax   = $('#coTax'),   elShip  = $('#coShip'),  elTotal  = $('#coTotal');
-  let qty = 1, payMethod = 'card';
+  let qty = 1, payMethod = 'card'; // card | paypal | venmo | cashapp | crypto
 
   const fmt = n => '$' + Number(n).toFixed(2);
   function setQty(n){ qty = Math.min(99, Math.max(1, n|0)); if(qtyInput) qtyInput.value = String(qty); updateTotals(); }
@@ -71,6 +80,12 @@
   $$('.qty-inc').forEach(b => b.addEventListener('click', ()=> setQty(qty+1)));
   $$('.qty-dec').forEach(b => b.addEventListener('click', ()=> setQty(qty-1)));
 
+  // ===== method selection (kept minimal; your UI can layer on dblclick -> step3)
+  function selectMethod(kind){ payMethod = kind; updateTotals(); }
+  window.selectPayCard   = ()=> selectMethod('card');
+  window.selectPayCrypto = ()=> selectMethod('crypto');
+  window.selectPayCash   = ()=> selectMethod('cashapp');
+
   // ===== step switching
   function currentStep(){ if (step3 && !step3.hidden) return 3; if (step2 && !step2.hidden) return 2; return 1; }
   function setStep(n){
@@ -84,18 +99,27 @@
   window.gotoStep2 = function(){ setStep(2); };
   window.gotoStep3 = function(){ setStep(3); };
 
-  // ===== customer data
-  function getStep1Val(n){ return step1?.querySelector(`[name="${n}"]`)?.value?.trim() || ''; }
+  // ===== customer data — now reads explicit first/last inputs
+  function qv(name){ return step1?.querySelector(`[name="${name}"]`)?.value?.trim() || ''; }
   function getCustomerMeta(){
-    const full = getStep1Val('name'); let first = full, last='';
-    if (full && full.includes(' ')){ const i=full.lastIndexOf(' '); first=full.slice(0,i); last=full.slice(i+1); }
-    return { first_name:first||'', last_name:last||'', email:getStep1Val('email'), phone:getStep1Val('phone'),
-             address:getStep1Val('address'), city:getStep1Val('city'), state:getStep1Val('state'), zip:getStep1Val('zip'), country:'US' };
+    return {
+      first_name: qv('first_name'),
+      last_name:  qv('last_name'),
+      email:      qv('email'),
+      phone:      qv('phone'),
+      address:    qv('address'),
+      city:       qv('city'),
+      state:      qv('state'),
+      zip:        qv('zip'),
+      country:    'US'
+    };
   }
+
+  // stable order id
   function getOrderId(){
     let id = sessionStorage.getItem('coOrderId');
     if (!id){
-      const email = getStep1Val('email') || (navigator.userAgent||'guest');
+      const email = qv('email') || (navigator.userAgent||'guest');
       let s=0; for (let i=0;i<email.length;i++) s = (s*31 + email.charCodeAt(i))>>>0;
       const uk = s.toString(36).toUpperCase().slice(0,5);
       id = 'T' + uk + '-' + Date.now().toString(36).toUpperCase().slice(-6);
@@ -114,6 +138,10 @@
       submit.textContent = 'Processing…';
 
       const customer = getCustomerMeta();
+      if (!customer.first_name || !customer.last_name) {
+        throw new Error('Please enter first and last name.');
+      }
+
       const token = await window.RecurlyUI.tokenize({});
 
       const payload = {
@@ -128,7 +156,7 @@
         postal_code: customer.zip,
         country: customer.country || 'US',
         items: [{ sku: 'tirz-vial', qty, price: PRICE }],
-        meta: { order_id: getOrderId(), qty, source: 'checkout.js v10.11.4' }
+        meta: { order_id: getOrderId(), qty, source: 'checkout.js v10.11.5' }
       };
 
       const resp = await fetch('/api/payments/recurly/charge', {
@@ -170,4 +198,13 @@
     };
     return Object.assign(base, overrides||{});
   }
+
+  // expose open/close
+  function startStock(){}
+  function stopStock(){}
+  window.checkoutOpen = function(){ modal.classList.add('show'); modal.style.display='grid';
+    document.documentElement.setAttribute('data-checkout-open','1'); document.body.style.overflow='hidden'; setStep(1); startStock(); };
+  window.checkoutClose = function(){ modal.classList.remove('show'); modal.style.display='none';
+    document.documentElement.removeAttribute('data-checkout-open'); document.body.style.overflow=''; stopStock(); };
+  window.checkoutBack  = function(){ const s=currentStep(); setStep(s===3?2:1); };
 })();
