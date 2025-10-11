@@ -1,18 +1,4 @@
-// ===== FB base loader (idempotent) — v13 =====
-(function(){
-  try {
-    // If real runtime (callMethod) isn't present, inject base script once
-    var real = (window.fbq && window.fbq.callMethod);
-    var already = !!document.querySelector('script[src*="fbevents.js"]');
-    if (!real && !already) {
-      var s = document.createElement('script');
-      s.async = true;
-      s.src = 'https://connect.facebook.net/en_US/fbevents.js';
-      s.setAttribute('data-co','fb-base');
-      document.head && document.head.appendChild(s);
-    }
-  } catch(e){}
-})();\n// ===== checkout.js — v10.11.2+namefix HOTFIX (quote fix for "we'll"/"you'll") =====
+// ===== checkout.js — v10.11.2+namefix HOTFIX (quote fix for "we'll"/"you'll") =====
 (function(){
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
