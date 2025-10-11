@@ -96,6 +96,28 @@
   // ===== step switching
   function currentStep(){ if (step3 && !step3.hidden) return 3; if (step2 && !step2.hidden) return 2; return 1; }
   function setStep(n){
+  // Pixel fires at step transitions
+  try {
+    if (typeof window.fbqSafe === 'function') {
+      if (n === 2) {
+        window.fbqSafe('InitiateCheckout', {
+          value: (typeof computeTotals === 'function' ? computeTotals().total : 90),
+          currency: 'USD',
+          contents: [{ id:'tirz-vial', quantity: 1, item_price: 90 }],
+          content_type: 'product'
+        });
+      }
+      if (n === 3) {
+        window.fbqSafe('AddPaymentInfo', {
+          value: (typeof computeTotals === 'function' ? computeTotals().total : 90),
+          currency: 'USD',
+          contents: [{ id:'tirz-vial', quantity: 1, item_price: 90 }],
+          content_type: 'product'
+        });
+      }
+    }
+  } catch(_){}
+
     [step1, step2, step3].forEach((el,i)=>{ if (!el) return; const on=(i===n-1); el.hidden=!on; el.setAttribute('aria-hidden', String(!on)); });
     if (n===3){
       renderStep3UI();
@@ -366,7 +388,18 @@ const token = await window.RecurlyUI.tokenize({
     renderStock(); stockTimer=setInterval(()=>{ renderStock(); if (stockNow()<=STOCK_END){ clearInterval(stockTimer); stockTimer=null; }},1000); }
   function stopStock(){ if (stockTimer){ clearInterval(stockTimer); stockTimer=null; } }
 
-  window.checkoutOpen = function(){ modal.classList.add('show'); modal.style.display='grid';
+  window.checkoutOpen = function(){
+  try {
+    if (typeof window.fbqSafe === 'function') {
+      window.fbqSafe('AddToCart', {
+        value: (typeof computeTotals === 'function' ? computeTotals().total : 90),
+        currency: 'USD',
+        contents: [{ id:'tirz-vial', quantity: 1, item_price: 90 }],
+        content_type: 'product'
+      });
+    }
+  } catch(_){}
+ modal.classList.add('show'); modal.style.display='grid';
     document.documentElement.setAttribute('data-checkout-open','1'); document.body.style.overflow='hidden'; setStep(1); startStock(); };
   window.checkoutClose = function(){ modal.classList.remove('show'); modal.style.display='none';
     document.documentElement.removeAttribute('data-checkout-open'); document.body.style.overflow=''; stopStock(); };
