@@ -44,7 +44,7 @@
   const PRICE = 90.00, TAX_RATE = 0.0874, ALT_DISC_RATE = 0.15;
   const qtyInput = $('#coQty');
   const elItems = $('#coItems'), elMerch = $('#coMerch'), elMethod = $('#coMethod');
-  const elTax   = $('#coTax'),   elShip  = $('#coShip'),  const elTotal  = $('#coTotal');
+  const elTax = $('#coTax'), elShip = $('#coShip'), elTotal = $('#coTotal');
   let qty = 1, payMethod = 'card'; // card | paypal | venmo | cashapp | crypto
 
   const fmt = n => '$' + Number(n).toFixed(2);
