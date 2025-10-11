@@ -1,4 +1,4 @@
-/* ===== recurly-wire.js v9 — robust singleton mount, dedupe, submit ===== */
+/* ===== recurly-wire.js v9.1 — robust singleton mount, dedupe, submit (name-safe) ===== */
 (function(){
   const $  = (s, ctx=document) => ctx.querySelector(s);
   const $$ = (s, ctx=document) => Array.from(ctx.querySelectorAll(s));
@@ -18,7 +18,7 @@
     // Remove any old #re-* containers
     wrap.querySelectorAll('#re-number, #re-month, #re-year, #re-cvv, #re-postal')
       .forEach(el => { const blk = el.closest('fieldset') || el.parentElement; (blk || el).remove(); });
-    // If multiple #recurly-number exist, keep the newest (last) and remove earlier
+    // If multiple #recurly-number exist, keep newest
     const nums = $$('#coPayWrap #recurly-number');
     if (nums.length > 1){
       for (let i=0; i<nums.length-1; i++){ const fs = nums[i].closest('fieldset'); if (fs) fs.remove(); else nums[i].remove(); }
@@ -79,9 +79,7 @@
     const s3 = $('#coStep3');
     return s3 && (s3.hidden === false || getComputedStyle(s3).display !== 'none');
   }
-  function startWhenVisible(){
-    if (step3Visible()){ tries = 0; mountLoop(); }
-  }
+  function startWhenVisible(){ if (step3Visible()){ tries = 0; mountLoop(); } }
 
   document.addEventListener('DOMContentLoaded', startWhenVisible);
   window.addEventListener('load', startWhenVisible);
@@ -93,22 +91,42 @@
     const btn = ev.target.closest('#coSubmit');
     if (!btn) return;
     ev.preventDefault();
+
+    // Build meta from Step 1 — supports single "Full Name" or split fields
     const step1 = document.getElementById('coStep1');
     const get = n => step1 ? (step1.querySelector(`[name='${n}']`)?.value || '').trim() : '';
-    const full = get('name'); const ix = full.lastIndexOf(' ');
-    const meta = { first_name: ix>0? full.slice(0,ix):full, last_name: ix>0? full.slice(ix+1):'', email:get('email'), phone:get('phone') };
+    let first = (get('first_name') || '').trim();
+    let last  = (get('last_name')  || '').trim();
+
+    if (!first || !last){
+      const full = get('name') || get('full_name') || get('cardholder') || '';
+      if (full){
+        const i = full.lastIndexOf(' ');
+        if (i > 0){ first = first || full.slice(0, i).trim(); last = last || full.slice(i+1).trim(); }
+        else { first = first || full; last = last || full; } // single word → duplicate
+      }
+    }
+    if (!first) first = 'Customer';
+    if (!last)  last  = 'Customer';
+
+    const meta = { first_name:first, last_name:last, email:get('email'), phone:get('phone') };
+
     try{
       btn.disabled = true;
       if (!isMounted()){ tries = 0; mountLoop(); throw new Error('Payment form not ready'); }
+
       const token = await window.RecurlyUI.tokenize(meta);
       const qty  = Number(document.querySelector('#coQty')?.value || 1) || 1;
       const unit = Number(document.body.dataset.price || 90) || 90;
+
       const res = await fetch('/api/payments/recurly/charge', {
         method:'POST', headers:{'Content-Type':'application/json'},
+        // server-side will handle qty/unit_amount shape
         body: JSON.stringify({ token: token?.id, qty, unit_amount: unit })
       });
       const out = await res.json();
       if (!res.ok) throw new Error(out?.error || out?.message || 'Charge failed');
+
       document.getElementById('checkoutSuccess')?.removeAttribute('hidden');
       document.getElementById('coStep3')?.setAttribute('hidden','hidden');
     } catch(e){
