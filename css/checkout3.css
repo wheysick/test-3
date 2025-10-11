@@ -1,0 +1,287 @@
+/* ===== checkout3.css — v7.4 (spacing, mobile header, alt tiles, fields) ===== */
+
+/* Modal & Card */
+#checkoutModal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+  background:radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,.06), rgba(0,0,0,.86));
+  backdrop-filter:blur(4px)}
+#checkoutModal.show{display:flex!important}
+.modal-content.checkout-card{
+  width:min(92vw,640px);max-height:calc(100dvh - 4rem);
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02)) #0f1319;
+  border:1px solid rgba(255,255,255,.10);border-radius:20px;box-shadow:0 28px 64px rgba(0,0,0,.55);
+  padding:72px clamp(18px,3.2vw,28px) 64px; /* extra top padding so back/close never overlap title */
+  color:#e9ecf2;overflow:auto;position:relative}
+@media (min-width:600px){ .modal-content.checkout-card{ padding-top:56px } }
+
+/* Back & Close */
+.co-back-link{position:absolute;left:12px;top:12px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.16);color:#e3e7f6;font-weight:800;font-size:13.5px;box-shadow:0 6px 16px rgba(0,0,0,.28);z-index:10}
+#checkoutClose{position:absolute;right:12px;top:12px;width:40px;height:40px;border-radius:999px;border:1px solid rgba(255,255,255,.16);
+  background:rgba(18,19,23,.92);color:#fff;display:flex;align-items:center;justify-content:center;z-index:10}
+
+/* Headings */
+.co-h3{margin:.2rem 0 .9rem;text-align:center;font-size:1.38rem;font-weight:900}
+.co-stockline{margin:-.25rem 0 .6rem;text-align:center;color:#b9bfd0}
+.co-stockline .qty{font-weight:900;animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{text-shadow:0 0 0 rgba(255,255,255,0)}50%{text-shadow:0 0 10px rgba(255,255,255,.45)}}
+
+/* Inputs + spacing */
+.co-pane{display:block}
+.co-pane label{display:flex;flex-direction:column;gap:6px;font-size:13.5px;opacity:.9}
+.co-pane input,.co-pane select{width:100%;padding:12px 14px;border-radius:12px;font-size:16px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);color:#fff;outline:0;transition:border-color .2s,box-shadow .2s}
+.co-pane input:focus,.co-pane select:focus{border-color:#C471F5;box-shadow:0 0 0 3px rgba(196,113,245,.22)}
+.co-actions{display:flex;justify-content:center;gap:10px;margin-top:12px}
+
+/* Step 1 grid */
+#coStep1 .co-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+#coStep1 .co-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px 16px}
+@media(max-width:640px){#coStep1 .co-grid,#coStep1 .co-row{grid-template-columns:1fr}}
+
+/* Buttons */
+.btn-main{border:0;border-radius:14px;background:linear-gradient(90deg,#C471F5,#FA71CD);color:#fff;font-weight:800;
+  box-shadow:0 12px 28px rgba(250,113,205,.28);transition:filter .2s}
+.btn-main:hover{filter:brightness(1.08)}
+.btn-lg{padding:13px 22px;font-size:15px}
+
+/* Step 2 qty + price */
+.qtybar{display:flex;justify-content:center;align-items:center;gap:12px;margin:10px 0 10px}
+.qtybar .qty-dec,.qtybar .qty-inc{width:44px;height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);color:#fff;font-weight:900}
+#coQty{width:86px;text-align:center;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff}
+.price-line{margin:.4rem 0 .9rem;text-align:center;color:#cfd3de}
+.price-line s{color:#8a91a2;margin-right:.35rem}
+.price-line strong{font-size:1.18rem}
+
+/* Payment tiles */
+.pm-card{width:100%;border-radius:12px;padding:.9rem 1rem;background:#2b2f55;color:#f5f7ff;font-weight:900;display:flex;gap:.6rem;
+  align-items:center;justify-content:center;border:0;cursor:pointer}
+.pm-card.is-selected{outline:3px solid rgba(196,113,245,.36)}
+.co-savings-note{text-align:center;margin:.5rem 0 .2rem;opacity:.9;font-size:13.5px}
+
+.pm-alt{display:flex;gap:.6rem;margin:.7rem 0;flex-wrap:wrap;justify-content:center}
+.pm-alt .pill{flex:1 1 160px;border-radius:12px;padding:.65rem .7rem;background:#1a1c23;color:#cbd1dc;font-weight:900;border:0;
+  cursor:pointer;opacity:1}
+.pm-alt .pill[aria-selected="true"]{outline:3px solid rgba(196,113,245,.36)}
+
+/* Totals card */
+.order-box{margin-top:.7rem;border:1px solid rgba(255,255,255,.12);background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0));
+  border-radius:14px;padding:.8rem .95rem}
+.order-box .line{display:flex;justify-content:space-between;padding:.45rem 0;color:#d6dae4;font-variant-numeric:tabular-nums}
+.order-box .line.total{border-top:1px dashed rgba(255,255,255,.14);margin-top:.4rem;padding-top:.6rem;font-weight:900;font-size:1.05rem}
+
+/* Step-3 panes */
+.cardset{border:1px dashed rgba(255,255,255,.14);border-radius:12px;padding:.9rem}
+.cardset legend{padding:0 .35rem;color:#a7a7ad;font-weight:700}
+#re-number,#re-month,#re-year,#re-cvv,#re-postal{
+  position:relative!important;display:block!important;height:46px!important;min-height:46px!important;max-height:46px!important;
+  padding:0 12px!important;border-radius:12px!important;border:1px solid rgba(255,255,255,.12)!important;background:rgba(255,255,255,.06)!important;
+  overflow:hidden!important;box-sizing:border-box!important}
+#re-number iframe,#re-month iframe,#re-year iframe,#re-cvv iframe,#re-postal iframe{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;border:0!important;border-radius:12px!important;display:block!important}
+
+/* Alternate methods pane */
+.alt-pane{border:1px dashed rgba(255,255,255,.14);border-radius:12px;padding:14px;margin:10px 0}
+.alt-pane h4{margin:.2rem 0 .6rem;font-size:1.1rem}
+.alt-pane .alt-row{margin:.4rem 0;color:#d6dae4;font-size:15px}
+.alt-pane .alt-actions{display:flex;justify-content:center;gap:10px;margin-top:10px}
+.alt-pane .alt-btn{border:0;border-radius:12px;padding:12px 16px;font-weight:800;cursor:pointer;color:#0f1116;background:#ffd44d}
+.alt-pane .alt-btn.secondary{background:#e2e8f0;color:#0f1116}
+
+/* Footer alignment */
+.footer-inner,.footer-legal{text-align:center}
+
+/* v7.5 adjustments (spacing, desktop 4-up, alt-pane center, footer spacing) */
+.modal-content.checkout-card{ padding:72px clamp(18px,3.2vw,28px) 64px; }
+@media (min-width:600px){ .modal-content.checkout-card{ padding-top:56px } }
+#coStep3 .co-row{ gap:16px; margin-bottom:10px }
+#re-number{ margin-bottom:12px }
+.pm-alt .pill{ cursor:pointer; opacity:1 }
+.pm-alt .pill[aria-selected="true"]{ outline:3px solid rgba(196,113,245,.36) }
+@media (min-width:900px){ .pm-alt{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:.6rem } .pm-alt .pill{ min-width:0 } }
+.alt-pane{ border:1px solid rgba(255,255,255,.14); text-align:center }
+.alt-pane .alt-row, .alt-pane h4{ text-align:center }
+.footer-inner{ padding-bottom:16px } .footer-form{ margin-bottom:12px } .footer-legal{ padding-top:14px }
+.review-card .rev-img{ width:100%; max-height:160px; object-fit:cover; border-radius:10px; display:block; margin:8px 0 6px }
+
+/* Alt-pay pane spacing polish */
+.alt-pane { padding: 16px 16px 18px; text-align: center; }
+.alt-pane h4 { margin: .2rem 0 .6rem; }
+.alt-pane .alt-row { margin: 8px 0; }
+.alt-pane .alt-actions { margin-top: 14px; gap: 10px; }
+
+/* Footer email input: fix oversize on mobile */
+@media (max-width: 600px) {
+  .footer .footer-form { flex-direction: column; }
+  .footer .footer-form input[type="email"]{
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;   /* cancel desktop min-width */
+    max-width: 100% !important;
+  }
+  .footer .footer-form button{ width:100% }
+}
+
+/* Reviews sidebar: remove inner scrollbar, let page scroll it */
+@media (min-width:1100px){
+  .reviews-col{
+    position: sticky;
+    top: 86px;
+    max-height: none !important;
+    overflow: visible !important;
+    padding-bottom: 0 !important;
+  }
+}
+
+/* paste at end of /css/checkout3.css */
+.checkout-card{ position:relative; }
+.checkout-card::before{
+  content:""; position:absolute; inset:-1px;
+  background:linear-gradient(135deg,#C471F5,transparent 40%,#FA71CD);
+  border-radius:inherit; filter:blur(12px); opacity:.25; pointer-events:none;
+}
+@media (prefers-reduced-motion:no-preference){
+  .checkout-card::before{ animation:aura 9s ease-in-out infinite alternate; }
+  @keyframes aura{ from{opacity:.18; transform:translateY(0)} to{opacity:.32; transform:translateY(4px)} }
+}
+
+.btn-main{ position:relative; overflow:hidden; }
+.btn-main::after{
+  content:""; position:absolute; inset:-50% -200%;
+  background:linear-gradient(120deg,transparent 45%, rgba(255,255,255,.35) 50%, transparent 55%);
+  transform:translateX(-60%); transition:transform .6s ease;
+  pointer-events:none; mix-blend-mode:screen;
+}
+.btn-main:hover::after{ transform:translateX(60%); }
+
+.co-success h4{ position:relative }
+.co-success h4::after{
+  content:""; position:absolute; left:50%; top:100%; width:0; height:2px;
+  background:linear-gradient(90deg,#C471F5,#FA71CD); transform:translateX(-50%);
+  animation:barGrow .7s .2s ease-out forwards;
+}
+@keyframes barGrow{ to{ width:120px } }
+
+.pm-alt .pill{ transition:transform .18s ease, outline-color .18s; }
+.pm-alt .pill:hover{ transform:translateY(-2px); }
+.pm-card{ transition:transform .18s ease }
+.pm-card:hover{ transform:translateY(-2px); }
+
+/* end of checkout3.css */
+.co-pane input.is-ok{ border-color:#7df3a2 !important; box-shadow:0 0 0 2px rgba(125,243,162,.18) }
+.co-pane input.is-bad{ border-color:#ff9ab3 !important; box-shadow:0 0 0 2px rgba(255,154,179,.18) }
+
+/* end of checkout3.css */
+#coCardPane .recurly-hosted-field:empty{
+  background:linear-gradient(90deg,#0f1116,#151821,#0f1116);
+  background-size: 200% 100%; animation:shimmer 1.1s infinite linear;
+}
+@keyframes shimmer{ to{ background-position:200% 0 } }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation:none !important; transition:none !important }
+}
+
+/* /css/checkout3.css */
+#coCardPane div[id^="re-"]:empty{
+  background:linear-gradient(90deg,#0f1116,#151821,#0f1116);
+  background-size: 200% 100%; animation:shimmer 1.1s infinite linear;
+  border:1px solid rgba(255,255,255,.12); border-radius:12px; height:46px;
+}
+@keyframes shimmer{ to{ background-position:200% 0 } }
+
+/* ===== Kill page scrollbars while checkout is open ===== */
+html[data-checkout-open="1"],
+html[data-checkout-open="1"] body{
+  overflow: hidden !important;   /* no page scrollbars */
+  width: 100%;
+  height: 100%;
+}
+
+/* Never create page scrollbars from the overlay itself */
+#checkoutModal{ overflow: hidden; }
+
+/* Internal scroll ONLY when content is taller than the viewport */
+.modal-content.checkout-card{
+  max-height: calc(100dvh - 4rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  contain: paint;                 /* isolates blur/auras so they can't bleed & cause scrollbars */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optional: hide the internal scrollbar UI entirely (keeps scrolling) */
+.modal-content.checkout-card{ scrollbar-width: none; }
+.modal-content.checkout-card::-webkit-scrollbar{ width:0; height:0 }
+
+/* If you added a fixed reading bar, make sure it doesn't force horizontal scroll */
+#scrollProgress{ left:0; right:0; width:auto; }  /* avoid 100vw */
+
+/* Center only the Crypto heading in Step 3 */
+#coAltPane .alt-pane.crypto h4{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  width:100%;
+  margin:0 auto;
+}
+
+/* When an alt method pane is visible, remove the outer card/container border */
+#checkoutModal[data-alt-mode="1"] #coCardPane,
+#checkoutModal[data-alt-mode="1"] .co-card,
+#checkoutModal[data-alt-mode="1"] .card {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* Keep a single, clean border on the inner alt pane */
+#coAltPane .alt-pane{
+  border: 1.5px solid #243042;   /* or your brand stroke */
+  border-radius: 16px;
+}
+
+#checkoutModal[data-alt-mode="1"] #coAltPane{
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+/* Remove the outer card border when an alt pane exists in Step 3 */
+#coStep3:has(#coAltPane .alt-pane) .co-card,
+#coStep3:has(#coAltPane .alt-pane) .card,
+#coStep3:has(#coAltPane .alt-pane) #coCardPane{
+  border:0 !important;
+  box-shadow:none !important;
+  background:transparent !important;
+  padding:0 !important;
+}
+
+/* Alt-pay row */
+#altPayRow{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;              /* wraps on narrow screens */
+  align-items:stretch;
+  justify-content:center;
+}
+
+/* Generic button */
+.alt-pay{
+  flex:1 1 220px;              /* grow/shrink with a sensible min */
+  max-width:320px;
+  padding:14px 18px;
+  border-radius:12px;
+  text-align:center;
+  position:relative;
+  z-index:0;                   /* prevents weird overlap shadows */
+  border:0;
+}
+
+/* Desktop: keep them in one row with fixed widths */
+@media (min-width: 900px){
+  #altPayRow{ flex-wrap:nowrap; }
+  .alt-pay{ flex:0 0 280px; }
+}

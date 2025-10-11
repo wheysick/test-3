@@ -1,0 +1,44 @@
+<!-- /thank-you.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Thank you</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/checkout.css">
+  <script src="/js/pixel.js"></script>
+</head>
+<body style="max-width:min(92vw,760px);margin:60px auto;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#E9ECF2;background:#0A0C10">
+  <h1 style="margin:.2rem 0 1rem;">Thank you!</h1>
+  <p>Your order is being prepared.</p>
+  <p id="orderLine" style="opacity:.9"></p>
+  <p><a href="/" style="color:#98b7ff">Back to site</a></p>
+
+  <script>
+    (function(){
+      // Read latest totals saved by checkout.js
+      const total  = Number(sessionStorage.getItem('coLastTotal') || '0');
+      const qty    = Number(sessionStorage.getItem('coLastQty') || '1');
+      const method = sessionStorage.getItem('coLastMethod') || 'card';
+      let orderId  = sessionStorage.getItem('coOrderId');
+      if (!orderId) {
+        orderId = 'T-' + (crypto?.randomUUID ? crypto.randomUUID().slice(0,8).toUpperCase() : Date.now());
+        sessionStorage.setItem('coOrderId', orderId);
+      }
+      const contents = [{ id: 'tirzepatide-bundle', quantity: qty }];
+
+      // Paint UI
+      const o = document.getElementById('orderLine');
+      if (o) o.textContent = `Order ${orderId} · ${qty} bottle(s) · ${method.toUpperCase()} · $${total.toFixed(2)}`;
+
+      // Fire Purchase (browser + server with event_id for dedupe)
+      if (typeof firePurchase === 'function') {
+        firePurchase({ value: total, currency:'USD', contents, order_id: orderId });
+      } else if (typeof fbqSafe === 'function') {
+        fbqSafe('Purchase', { value: total, currency:'USD', contents, content_type:'product', order_id: orderId });
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "selfhacking-checkout",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "recurly": "^4.54.0"
+  }
+}

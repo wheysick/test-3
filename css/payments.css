@@ -1,0 +1,202 @@
+/* ===== payments.css — colorful alt methods + crypto pane ===== */
+:root {
+  --pm-radius: 14px;
+  --pm-shadow: 0 8px 24px rgba(0,0,0,.12);
+  --pm-border: rgba(255,255,255,.08);
+}
+
+.pm { border:1.5px solid var(--pm-border); border-radius: var(--pm-radius); padding:12px 14px; display:flex; align-items:center; gap:10px; cursor:pointer; transition:transform .18s ease, box-shadow .18s ease, opacity .18s ease; user-select:none; }
+.pm:hover { transform: translateY(-1px); box-shadow: var(--pm-shadow); }
+.pm.is-selected { outline: 2px solid rgba(255,255,255,.18); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
+
+.pm--card  { background: linear-gradient(135deg, #2b2b2b 0%, #0f0f10 100%); color:#fff; }
+.pm--paypal{ background: linear-gradient(135deg, #003087 0%, #0070E0 100%); color:#fff; }
+.pm--venmo { background: linear-gradient(135deg, #3D95CE 0%, #1991EB 100%); color:#fff; }
+.pm--cashapp{ background: linear-gradient(135deg, #00C244 0%, #00D632 100%); color:#fff; }
+.pm--crypto{ background: linear-gradient(135deg, #F7931A 0%, #627EEA 100%); color:#fff; }
+
+/* Step 3 alt panes */
+.alt-pane { background: #0d0f12; border:1.5px solid #243042; border-radius: 16px; padding:16px; color:#EAEFF7; }
+.alt-pane h4 { margin:0 0 8px; display:flex; align-items:center; gap:8px; font-weight:800; font-size:18px; letter-spacing:.2px; }
+.alt-row { margin:6px 0; }
+
+.alt-pane.crypto { background: radial-gradient(120% 140% at 0% 0%, rgba(22,82,240,.08), transparent), #0d0f12; border-color:#1f3b7a; }
+
+.badges { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 6px; }
+.badge { background:#151b26; border:1px solid #27334a; color:#cfe1ff; padding:6px 10px; border-radius: 999px; font-size:12px; font-weight:800; letter-spacing:.2px; }
+.badge.coin-btc { border-color:#8a5a00; }
+.badge.coin-eth { border-color:#3a3d8f; }
+.badge.coin-usdc{ border-color:#1f4fa8; }
+
+.summary-table { margin:10px 0; font-size:14px; border-top:1px dashed #27334a; padding-top:8px; }
+.summary-table .line { display:flex; justify-content:space-between; margin:4px 0; gap:14px; }
+.summary-table .line.total { font-size:16px; font-weight:900; border-top:1px solid #27334a; padding-top:6px; }
+
+.crypto-steps { margin:10px 0 6px 18px; color:#b8c6df; line-height:1.5; }
+.note { font-size:12px; opacity:.9; margin-top:8px; color:#b7c7e6; }
+
+.alt-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+.alt-btn { padding:12px 16px; border-radius: 12px; border:0; font-weight:900; letter-spacing:.3px; }
+.alt-btn#altPrimary { background:#1652F0; color:white; box-shadow: 0 8px 20px rgba(22,82,240,.35); }
+.alt-btn.secondary { background:#1a2230; color:#c5d3ea; }
+
+.tab-toggle { display:flex; align-items:center; gap:6px; font-size:12px; margin-top:8px; color:#b8c6df; }
+
+/* Center only the Crypto heading in Step 3 */
+#coAltPane .alt-pane.crypto h4 {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* (Optional) Center the action buttons in Step 3 for all alt methods */
+#coAltPane .alt-actions {
+  display: flex;            /* just in case it isn't already */
+  justify-content: center;
+}
+
+/* Center ONLY the crypto H4 on Step 3 */
+#coAltPane .alt-pane.crypto h4{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  width:100%;
+  margin:0 auto;
+}
+
+/* Make Step-3 alt-pane buttons centered too (optional) */
+#coAltPane .alt-actions{
+  display:flex;          /* safe guard */
+  justify-content:center;
+}
+
+/* Remove the “double border” when an alt method is shown (single, clean border) */
+/* If your browser support is modern (Chrome 140 on your screenshot), use :has() */
+#coStep3:has(#coAltPane:not([hidden]) .alt-pane) .co-card,
+#coStep3:has(#coAltPane:not([hidden]) .alt-pane) #coCardPane{
+  border:0 !important;
+  box-shadow:none !important;
+  background:transparent !important;
+  padding:0 !important;
+}
+#coStep3:has(#coAltPane:not([hidden]) .alt-pane) #coAltPane{
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+/* Keep a single border on the inner alt pane */
+#coAltPane .alt-pane{
+  border:1.5px solid #243042;   /* adjust to your theme */
+  border-radius:16px;
+}
+
+/* Step 3 — center only the Crypto heading */
+#coAltPane .alt-pane.crypto > h4,
+#coAltPane .alt-pane[data-method="crypto"] > h4 {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  text-align: center !important;
+  width: 100%;
+  margin: 0 auto !important;
+}
+
+/* ===== payments_colors.css — hide venmo/paypal; colorful Cash App + Crypto ===== */
+#pmPayPal, #pmVenmo { display:none !important; }
+
+.pm { border-radius: 14px; padding:12px 14px; display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; transition: transform .18s ease, box-shadow .18s ease; }
+.pm:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.14); }
+.pm.is-selected { outline: 2px solid rgba(255,255,255,.18); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
+
+.pm--cashapp { background: #00C244; color:#0b1b0f; font-weight:800; }
+.pm--crypto  { background: #F7931A; color:#111111; font-weight:800; }
+
+/* Step 3 headers tint (optional) */
+#coAltPane .alt-pane[data-method="cashapp"] h4 { color:#00C244; }
+#coAltPane .alt-pane[data-method="crypto"]  h4 { color:#F7931A; }
+
+/* ——— STEP 2 ONLY: colorful payment tiles ——— */
+#coStep2 #pmCashApp {
+  background: #00C244;        /* Cash App green */
+  color: #0b1b0f;             /* high contrast on green */
+  font-weight: 800;
+  border-radius: 14px;
+  padding: 12px 14px;
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+#coStep2 #pmCrypto {
+  background: #F7931A;        /* Bitcoin orange */
+  color: #111111;             /* high contrast on orange */
+  font-weight: 800;
+  border-radius: 14px;
+  padding: 12px 14px;
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+
+/* Tile hover/selected effects (nice pop without changing step 3) */
+#coStep2 #pmCashApp:hover,
+#coStep2 #pmCrypto:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.14); }
+#coStep2 #pmCashApp.is-selected,
+#coStep2 #pmCrypto.is-selected { outline: 2px solid rgba(255,255,255,.2); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
+
+/* Keep other methods neutral if they’re still visible */
+#coStep2 #pmCard,
+#coStep2 #pmPayPal,
+#coStep2 #pmVenmo {
+  background: #11161d;
+  color: #e6eefc;
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+/* If you previously tinted Step 3 headers, neutralize them here */
+#coAltPane .alt-pane h4 { color: inherit !important; }
+
+/* (Optional) Hide PayPal/Venmo in Step 2 explicitly */
+#coStep2 #pmPayPal,
+#coStep2 #pmVenmo { display: none !important; }
+
+/* Desktop: center the payment tiles in Step 2 */
+@media (min-width: 992px) {
+  /* Use your actual container id/class; #coPayWrap is common in your code */
+  #coPayWrap,
+  #coStep2 .co-pay-wrap,
+  #coStep2 .pay-methods {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    justify-content: center;         /* centers the grid itself */
+    gap: 16px 20px;
+    max-width: 620px;                /* keeps them as a tight block */
+    margin: 0 auto;                  /* centers the block in the page */
+  }
+
+  /* Make each tile self-centered */
+  #coPayWrap .pm,
+  #coStep2 .co-pay-wrap .pm,
+  #coStep2 .pay-methods .pm {
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+/* If your container isn’t any of those, force-center the tiles as a fallback */
+@media (min-width: 992px) {
+  #coStep2 #pmCard,
+  #coStep2 #pmCashApp,
+  #coStep2 #pmCrypto,
+  #coStep2 #pmPayPal,
+  #coStep2 #pmVenmo {
+    display: inline-flex;
+    justify-content: center;
+    text-align: center;
+    min-width: 240px;
+    margin: 0 10px 12px;
+  }
+  #coStep2 .pm:first-of-type { margin-left: auto; }
+  #coStep2 .pm:last-of-type  { margin-right: auto; }
+}

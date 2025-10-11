@@ -1,0 +1,2 @@
+#re-number,#re-month,#re-year,#re-cvv,#re-postal{border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);padding:12px 10px;color:#eaecef;min-height:44px;}
+#re-number{margin-bottom:12px;}#re-postal{margin-top:12px;}
