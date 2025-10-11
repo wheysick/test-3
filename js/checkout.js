@@ -110,38 +110,9 @@
 
   function getStep1Val(n){ return step1?.querySelector(`[name="${n}"]`)?.value?.trim() || ''; }
   function getCustomerMeta(){
-  const get = (n) => (getStep1Val(n) || '').trim();
-
-  const full = get('name');
-  let first = '', last = '';
-
-  if (full && full.includes(' ')) {
-    const i = full.lastIndexOf(' ');
-    first = full.slice(0, i).trim();
-    last  = full.slice(i + 1).trim();
-  } else if (full) {
-    // Single-word name: duplicate into both fields to satisfy validators
-    first = full;
-    last  = full;
-  } else {
-    // No name entered: safe hard defaults
-    first = 'Customer';
-    last  = 'Customer';
-  }
-
-  return {
-    first_name: first,
-    last_name:  last,
-    email:  get('email'),
-    phone:  get('phone'),
-    address: get('address'),
-    city:    get('city'),
-    state:   get('state'),
-    zip:     get('zip'),
-    country: 'US'
-  };
-}
-return { first_name:first||'', last_name:last||'', email:getStep1Val('email'), phone:getStep1Val('phone'),
+    const full = getStep1Val('name'); let first = full, last='';
+    if (full && full.includes(' ')){ const i=full.lastIndexOf(' '); first=full.slice(0,i); last=full.slice(i+1); }
+    return { first_name:first||'', last_name:last||'', email:getStep1Val('email'), phone:getStep1Val('phone'),
              address:getStep1Val('address'), city:getStep1Val('city'), state:getStep1Val('state'), zip:getStep1Val('zip'), country:'US' };
   }
   function getOrderId(){
