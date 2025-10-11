@@ -1,4 +1,4 @@
-// ===== checkout.js — v10.11.5 (full + Recurly payload + explicit first/last) =====
+// ===== checkout.js — v10.11.7 (compat payload: root + customer + billing_info + name) =====
 (function(){
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
@@ -8,103 +8,31 @@
   const step2   = $('#coStep2');
   const step3   = $('#coStep3');
   const submit  = $('#coSubmit');
-  const close   = $('#checkoutClose');
-  const toStep2 = $('#coToStep2');
-  const toStep3 = $('#coToStep3');
-  const cardset = $('#coCardPane');
-  const altPane = $('#coAltPane');
+  let   payMethod = 'card';
 
-  // ===== modal open/close
-  document.addEventListener('click', function(e){
-    const a = e.target.closest && e.target.closest('.open-checkout');
-    if (!a) return;
-    e.preventDefault();
-    checkoutOpen();
-    fbqSafe('AddToCart', pixelCartData({ value: (qty||1) * (PRICE||90) }));
-  }, true);
-
-  if (close) close.addEventListener('click', (e)=>{ e.preventDefault(); checkoutClose(); });
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && modal.classList.contains('show')) checkoutClose(); }, true);
-  modal.addEventListener('click', (e)=>{ if (e.target === modal) checkoutClose(); });
-
-  modal.addEventListener('click', function(e){
-    const g2 = e.target.closest && e.target.closest('#coToStep2, [data-goto-step="2"]');
-    if (g2){ e.preventDefault(); setStep(2); return; }
-    const g3 = e.target.closest && e.target.closest('#coToStep3, [data-goto-step="3"]');
-    if (g3){ e.preventDefault(); setStep(3); return; }
-  }, true);
-
-  // Prevent native submits (keeps modal alive)
-  modal.addEventListener('submit', (e)=>{ if (modal.contains(e.target)) e.preventDefault(); }, true);
-
-  // Step 1 -> Step 2
-  step1 && step1.addEventListener('submit', (e)=>{
-    e.preventDefault();
-    // basic presence checks so we don't advance with blanks
-    const c = getCustomerMeta();
-    if (!c.first_name || !c.last_name || !c.email) {
-      alert('Please enter your first name, last name, and email to continue.');
-      return;
-    }
-    setStep(2);
-    fbqSafe('InitiateCheckout', pixelCartData({ num_items: qty }));
-  }, true);
-
-  // ===== pricing
-  const PRICE = 90.00, TAX_RATE = 0.0874, ALT_DISC_RATE = 0.15;
-  const qtyInput = $('#coQty');
-  const elItems = $('#coItems'), elMerch = $('#coMerch'), elMethod = $('#coMethod');
-  const elTax   = $('#coTax'),   elShip  = $('#coShip'),  elTotal  = $('#coTotal');
-  let qty = 1, payMethod = 'card'; // card | paypal | venmo | cashapp | crypto
-
-  const fmt = n => '$' + Number(n).toFixed(2);
-  function setQty(n){ qty = Math.min(99, Math.max(1, n|0)); if(qtyInput) qtyInput.value = String(qty); updateTotals(); }
-  function computeTotals(){
-    const merch = qty * PRICE;
-    const disc  = (payMethod === 'card') ? 0 : +(merch * ALT_DISC_RATE).toFixed(2);
-    const taxable = Math.max(0, merch - disc);
-    const tax   = +(taxable * TAX_RATE).toFixed(2);
-    const total = +(taxable + tax).toFixed(2);
-    return { merch, disc, tax, total, taxable };
-  }
-  function updateTotals(){
-    const { merch, disc, tax, total } = computeTotals();
-    elItems && (elItems.textContent = `${qty*2} bottles (${qty} paid + ${qty} free)`);
-    elMerch && (elMerch.textContent = fmt(merch));
-    elMethod && (elMethod.textContent = disc ? ('−' + fmt(disc)) : fmt(0));
-    elTax   && (elTax.textContent   = fmt(tax));
-    elShip  && (elShip.textContent  = 'FREE');
-    elTotal && (elTotal.textContent = fmt(total));
-  }
-  qtyInput && qtyInput.addEventListener('input', ()=>{ const v=parseInt(qtyInput.value.replace(/[^0-9]/g,''),10); setQty(isNaN(v)?1:v); });
-  $$('.qty-inc').forEach(b => b.addEventListener('click', ()=> setQty(qty+1)));
-  $$('.qty-dec').forEach(b => b.addEventListener('click', ()=> setQty(qty-1)));
-
-  // ===== method selection (kept minimal; your UI can layer on dblclick -> step3)
-  function selectMethod(kind){ payMethod = kind; updateTotals(); }
-  window.selectPayCard   = ()=> selectMethod('card');
-  window.selectPayCrypto = ()=> selectMethod('crypto');
-  window.selectPayCash   = ()=> selectMethod('cashapp');
-
-  // ===== step switching
-  function currentStep(){ if (step3 && !step3.hidden) return 3; if (step2 && !step2.hidden) return 2; return 1; }
-  function setStep(n){
-    [step1, step2, step3].forEach((el,i)=>{ if (!el) return; const on=(i===n-1); el.hidden=!on; el.setAttribute('aria-hidden', String(!on)); });
-    if (n===3){
-      if (payMethod === 'card') { window.RecurlyUI?.mount(); } else { window.RecurlyUI?.unmount(); }
-    } else {
-      window.RecurlyUI?.unmount();
-    }
-  }
-  window.gotoStep2 = function(){ setStep(2); };
-  window.gotoStep3 = function(){ setStep(3); };
-
-  // ===== customer data — now reads explicit first/last inputs
+  // --- field helpers (support both Full Name and split fields) ---
   function qv(name){ return step1?.querySelector(`[name="${name}"]`)?.value?.trim() || ''; }
+  function resolveFirst(){
+    const fn = qv('first_name') || qv('firstname') || qv('given_name');
+    if (fn) return fn;
+    const full = qv('name'); if (!full) return '';
+    const i = full.trim().lastIndexOf(' ');
+    return i>0 ? full.slice(0,i).trim() : full.trim();
+  }
+  function resolveLast(){
+    const ln = qv('last_name') || qv('lastname') || qv('family_name');
+    if (ln) return ln;
+    const full = qv('name'); if (!full) return '';
+    const parts = full.trim().split(/\s+/);
+    return parts.length>1 ? parts.pop() : '';
+  }
   function getCustomerMeta(){
+    const first_name = resolveFirst();
+    const last_name  = resolveLast();
     return {
-      first_name: qv('first_name'),
-      last_name:  qv('last_name'),
+      first_name,
+      last_name,
+      full_name: [first_name, last_name].filter(Boolean).join(' '),
       email:      qv('email'),
       phone:      qv('phone'),
       address:    qv('address'),
@@ -115,12 +43,21 @@
     };
   }
 
-  // stable order id
+  const PRICE = 90.00, TAX_RATE = 0.0874, ALT_DISC_RATE = 0.15;
+  let qty = 1;
+  function computeTotals(){
+    const merch = qty * PRICE;
+    const disc  = (payMethod === 'card') ? 0 : +(merch * ALT_DISC_RATE).toFixed(2);
+    const taxable = Math.max(0, merch - disc);
+    const tax   = +(taxable * TAX_RATE).toFixed(2);
+    const total = +(taxable + tax).toFixed(2);
+    return { merch, disc, tax, total, taxable };
+  }
   function getOrderId(){
     let id = sessionStorage.getItem('coOrderId');
     if (!id){
-      const email = qv('email') || (navigator.userAgent||'guest');
-      let s=0; for (let i=0;i<email.length;i++) s = (s*31 + email.charCodeAt(i))>>>0;
+      const seed = qv('email') || (navigator.userAgent||'guest');
+      let s=0; for (let i=0;i<seed.length;i++) s = (s*31 + seed.charCodeAt(i))>>>0;
       const uk = s.toString(36).toUpperCase().slice(0,5);
       id = 'T' + uk + '-' + Date.now().toString(36).toUpperCase().slice(-6);
       sessionStorage.setItem('coOrderId', id);
@@ -128,7 +65,7 @@
     return id;
   }
 
-  // ===== Recurly submit (fixed payload)
+  // ===== Recurly submit (broadly compatible payload) =====
   submit && submit.addEventListener('click', async (e)=>{
     e.preventDefault();
     try {
@@ -137,39 +74,69 @@
       submit.disabled = true;
       submit.textContent = 'Processing…';
 
-      const customer = getCustomerMeta();
-      if (!customer.first_name || !customer.last_name) {
-        throw new Error('Please enter first and last name.');
+      const c = getCustomerMeta();
+      if (!c.first_name || !c.last_name){
+        alert('Please provide your first and last name.');
+        return;
       }
 
       const token = await window.RecurlyUI.tokenize({});
 
+      const customerRoot = {
+        first_name: c.first_name,
+        last_name:  c.last_name,
+        email:      c.email,
+        phone:      c.phone,
+        address:    c.address,
+        city:       c.city,
+        state:      c.state,
+        postal_code:c.zip,
+        country:    c.country
+      };
+
       const payload = {
         token: token.id || token,
-        first_name: customer.first_name,
-        last_name: customer.last_name,
-        email: customer.email,
-        phone: customer.phone,
-        address: customer.address,
-        city: customer.city,
-        state: customer.state,
-        postal_code: customer.zip,
-        country: customer.country || 'US',
+
+        // (1) top-level keys
+        ...customerRoot,
+        name: c.full_name,              // some validators look for a single "name"
+        full_name: c.full_name,         // and/or this alias
+
+        // (2) billing aliases
+        billing_first_name: c.first_name,
+        billing_last_name:  c.last_name,
+        billing_address:    c.address,
+        billing_city:       c.city,
+        billing_state:      c.state,
+        billing_postal_code:c.zip,
+        billing_country:    c.country,
+
+        // (3) nested objects commonly used by Recurly-like services
+        customer: { ...customerRoot, name: c.full_name },
+        billing_info: {
+          first_name: c.first_name,
+          last_name:  c.last_name,
+          address1:   c.address,
+          city:       c.city,
+          region:     c.state,
+          postal_code:c.zip,
+          country:    c.country
+        },
+
         items: [{ sku: 'tirz-vial', qty, price: PRICE }],
-        meta: { order_id: getOrderId(), qty, source: 'checkout.js v10.11.5' }
+        meta: { order_id: getOrderId(), qty, source: 'checkout.js v10.11.7' }
       };
+
+      try { console.log('[checkout] Recurly charge payload:', payload); } catch(_){}
 
       const resp = await fetch('/api/payments/recurly/charge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-
-      const data = await resp.json().catch(() => null);
+      const data = await resp.json().catch(()=>null);
       if (!resp.ok) {
-        const reasons = Array.isArray(data?.errors)
-          ? `\n• ${data.errors.join('\n• ')}`
-          : '';
+        const reasons = Array.isArray(data?.errors) ? ('\n• ' + data.errors.join('\n• ')) : '';
         throw new Error((data?.error || `Payment failed (HTTP ${resp.status})`) + reasons);
       }
 
@@ -178,7 +145,6 @@
       sessionStorage.setItem('coLastTotal', String(t.total));
       sessionStorage.setItem('coLastQty', String(qty));
       sessionStorage.setItem('coLastOrderId', oid);
-
       window.location.href = `/thank-you.html?m=card&order=${encodeURIComponent(oid)}`;
     } catch (err) {
       alert(err?.message || 'Payment failed');
@@ -188,23 +154,4 @@
     }
   });
 
-  // ===== pixels/helpers
-  function fbqSafe(event, params, opts){ try{ if (window.fbq) window.fbq('track', event, params||{}, opts||{}); }catch{} }
-  function pixelCartData(overrides){
-    const t = computeTotals?.() || { total: 0 }; const base = {
-      value: t.total, currency:'USD',
-      contents:[{ id:'tirz-vial', quantity: qty, item_price: PRICE }],
-      content_type:'product'
-    };
-    return Object.assign(base, overrides||{});
-  }
-
-  // expose open/close
-  function startStock(){}
-  function stopStock(){}
-  window.checkoutOpen = function(){ modal.classList.add('show'); modal.style.display='grid';
-    document.documentElement.setAttribute('data-checkout-open','1'); document.body.style.overflow='hidden'; setStep(1); startStock(); };
-  window.checkoutClose = function(){ modal.classList.remove('show'); modal.style.display='none';
-    document.documentElement.removeAttribute('data-checkout-open'); document.body.style.overflow=''; stopStock(); };
-  window.checkoutBack  = function(){ const s=currentStep(); setStep(s===3?2:1); };
 })();
