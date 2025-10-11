@@ -1,4 +1,4 @@
-// ===== checkout.js — v10.11.2+namefix (minimal change, preserves Cash App/Crypto) =====
+// ===== checkout.js — v10.11.2+namefix HOTFIX (quote fix for "we'll"/"you'll") =====
 (function(){
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
@@ -44,7 +44,7 @@
   const PRICE = 90.00, TAX_RATE = 0.0874, ALT_DISC_RATE = 0.15;
   const qtyInput = $('#coQty');
   const elItems = $('#coItems'), elMerch = $('#coMerch'), elMethod = $('#coMethod');
-  const elTax   = $('#coTax'),   elShip  = $('#coShip'),  elTotal  = $('#coTotal');
+  const elTax   = $('#coTax'),   elShip  = $('#coShip'),  const elTotal  = $('#coTotal');
   let qty = 1, payMethod = 'card'; // card | paypal | venmo | cashapp | crypto
 
   const fmt = n => '$' + Number(n).toFixed(2);
@@ -197,9 +197,9 @@
       </div>`;
     } else if (payMethod === 'crypto'){
       title = 'Pay with Crypto';
-      body  = 'You\\'ll be redirected to Coinbase Commerce to pay with BTC, ETH, USDC, and more.';
+      body  = "You'll be redirected to Coinbase Commerce to pay with BTC, ETH, USDC, and more.";
       primary = 'Continue to Coinbase'; url = '#';
-      help = 'After the network confirms, we\\'ll email you and ship.';
+      help = "After the network confirms, we'll email you and ship.";
     }
 
     const h4Style = (payMethod === 'cashapp' || payMethod === 'crypto')
