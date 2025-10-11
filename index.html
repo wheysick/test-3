@@ -3,18 +3,26 @@
 <head>
 <!-- /META PIXEL -->
 <link rel="stylesheet" href="/css/payments.css?v=1">
-<script src="/js/pixel.js"></script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Breaking News — Weekly Wellness Formula</title>
   <meta name="recurly-public-key" content="ewr1-AxqCz2aZ9UMj5oOBsENPG2">
   <script src="https://js.recurly.com/v4/recurly.js"></script>
-  <script src="/js/recurly-elements.js?v=6" defer></script>
+  <!-- META PIXEL (load once) -->
+<script defer src="/js/pixel.js?v=4"></script>
+<script defer src="/js/pixel-events.js?v=2"></script>
+
+<!-- Checkout (load once — keep the NEWER version) -->
+<script src="/js/checkout.js?v=10112"></script>
+
+<!-- Other app scripts (defer is fine) -->
+<script defer src="/js/recurly-elements.js?v=6"></script>
+<script defer src="/js/config.js?v=641"></script>
+<script defer src="/js/script.js?v=641"></script>
   <link rel="stylesheet" href="/css/style.css?v=640">
   <link rel="stylesheet" href="/css/checkout.css?v=9013">
   <link rel="stylesheet" href="/css/checkout3.css?v=7021">
   <link rel="stylesheet" href="/css/payments.css">
-<script src="/js/pixel-events.js" defer></script>
 
 </head>
 <body>
@@ -210,9 +218,6 @@
     </div>
     <div class="footer-legal" style="text-align:center">© 2025 SelfHacking. All rights reserved.</div>
   </footer>
-
-  <script defer src="/js/config.js?v=641"></script>
-  <script defer src="/js/script.js?v=641"></script>
   <script>
     // Belt & suspenders CTA opener (capture beats other listeners and works even if checkout.js hasn't loaded yet)
     document.addEventListener('click', function(e){
@@ -231,6 +236,5 @@
     }, true);
   </script>
 <!-- before </body> -->
-<script src="/js/checkout.js"></script>
 </body>
 </html>
