@@ -322,7 +322,7 @@ const token = await window.RecurlyUI.tokenize({
   email:       customer.email || undefined,
   address1:    customer.address || undefined, // REQUIRED by your site settings
   city:        customer.city    || undefined, // REQUIRED
-  region:      customer.state   || undefined, // state / province
+  region:     stateVal || 'NA',  // ensures Recurly gets a non-empty value
   postal_code: customer.zip     || undefined, // REQUIRED
   country:    (customer.country || 'US').toUpperCase() // ISO-2; defaults to US
 });
