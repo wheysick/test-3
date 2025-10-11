@@ -1,11 +1,10 @@
-/* pixel.js — v4.0 FINAL
-   - Loads Meta Pixel (1051611783243364) and routes ALL tracks to it
-   - Ignores any other fbq('init', ...) calls
-   - Fires ecommerce events on REAL state changes (no brittle selectors):
-       • AddToCart        => checkout modal opens
-       • InitiateCheckout => Step 2 becomes visible
-       • AddPaymentInfo   => Step 3 becomes visible
-   - Idempotent & duplicate-safe
+/* pixel.js — v4.1 (single pixel + eventID + CAPI relay)
+   - Loads Meta base, inits Pixel 1051611783243364
+   - Forces all tracks to that pixel (trackSingle)
+   - Fires ATC / IC / API on real state changes
+   - fbqSafe(name, params) now:
+       • adds eventID (name::session)
+       • POSTs to /api/meta/capi.js with { event, event_id, value, currency, contents }
 */
 (function () {
   'use strict';
@@ -69,9 +68,8 @@
 
   // -------- helpers --------
   function ready(fn){
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', fn, { once:true });
-    } else { fn(); }
+    if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(fn,0);
+    else document.addEventListener('DOMContentLoaded', fn);
   }
   function isShown(el){
     if (!el) return false;
@@ -90,12 +88,38 @@
     var n = Number(m[0].replace(/,/g,''));
     return isFinite(n) ? n : undefined;
   }
+
+  // -------- unified fbqSafe (adds eventID + CAPI relay) --------
   function fbqSafe(eventName, params){
     try {
       if (!window.fbq) return;
       var name = String(eventName||'').replace(/\s+/g,'');
       var payload = Object.assign({ currency:'USD', content_type:'product' }, params||{});
-      fbq('trackSingle', PIXEL_ID, name, payload);
+
+      // stable-ish session id
+      var sessKey = 'co_sess';
+      var sess = sessionStorage.getItem(sessKey);
+      if (!sess) { sess = Math.random().toString(36).slice(2) + Date.now(); sessionStorage.setItem(sessKey, sess); }
+      var eventID = name + '::' + sess;
+
+      // browser
+      fbq('trackSingle', PIXEL_ID, name, Object.assign({ eventID: eventID }, payload));
+
+      // CAPI relay to your server
+      try {
+        fetch('/api/meta/capi.js', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            event: name,
+            event_id: eventID,
+            value: (typeof payload.value === 'number') ? payload.value : 0,
+            currency: payload.currency || 'USD',
+            contents: payload.contents || []
+          }),
+          keepalive: true
+        });
+      } catch(_) {}
     } catch(e){}
   }
 
@@ -126,44 +150,24 @@
       if (s3 && isShown(s3)) fireAPI();
     }
 
-    // initial and delayed checks
+    // initial + observe root mutations that could reveal steps
     setTimeout(check, 60);
-    setTimeout(check, 200);
-
-    // observe any attribute/class/style changes that reveal steps/modal
     try {
       var mo = new MutationObserver(check);
-      mo.observe(document.documentElement, {
-        subtree: true,
-        childList: true,
-        attributes: true,
-        attributeFilter: ['hidden','aria-hidden','class','style']
-      });
+      mo.observe(document.body, { attributes:true, childList:true, subtree:true });
     } catch(_){}
-
-    // ultra-robust: detect modal open caused by *any* click
-    document.addEventListener('click', function(){
-      var wasATC = fired.ATC;
-      setTimeout(function(){
-        if (!wasATC && modal && isShown(modal)) fireATC();
-      }, 60);
-    }, true);
   }
 
-  // also hook your globals if present (no behavior change, just signal)
-  function wrapWhenAvailable(name, onCall){
-    var tries = 0;
+  // wrap when global functions become available (safety net)
+  function wrapWhenAvailable(fnName, onCall){
+    var tries=0;
     (function tryWrap(){
-      var fn = window[name];
-      if (typeof fn === 'function' && !fn.__px_wrapped__) {
+      var fn = window[fnName];
+      if (typeof fn === 'function' && !fn.__px_wrapped) {
         var orig = fn;
-        var wrapped = function(){
-          try { onCall(); } catch(_){}
-          return orig.apply(this, arguments);
-        };
-        wrapped.__px_wrapped__ = true;
-        try { Object.defineProperty(wrapped, 'name', { value: name }); } catch(_){}
-        window[name] = wrapped; return;
+        window[fnName] = function(){ try{ onCall(); }catch(_){ } return orig.apply(this, arguments); };
+        window[fnName].__px_wrapped = true;
+        return;
       }
       if (tries++ < 80) setTimeout(tryWrap, 100);
     })();
@@ -172,26 +176,32 @@
   ready(function(){
     bindObservers();
     wrapWhenAvailable('checkoutOpen', fireATC);
-    wrapWhenAvailable('gotoStep2',    fireIC);
-    wrapWhenAvailable('gotoStep3',    fireAPI);
+    wrapWhenAvailable('gotoStep2',  fireIC);
+    wrapWhenAvailable('gotoStep3',  fireAPI);
   });
 
-  // -------- optional: Purchase browser+server helper (unchanged for you) --------
-  window.firePurchase = async function(opts){
-    opts = opts || {};
-    var value    = Number(opts.value || 0);
-    var currency = opts.currency || 'USD';
-    var contents = opts.contents || [];
-    var order_id = opts.order_id || null;
-    var event_id = opts.event_id || (self.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-    var params   = { value, currency, contents, content_type:'product', order_id, event_id };
+  // -------- expose purchase helper (adds eventID + CAPI relay) --------
+  window.checkoutTrack = window.checkoutTrack || {};
+  window.checkoutTrack.purchase = async function(details){
+    var value    = (details && typeof details.value === 'number') ? details.value : (numFromElText('#coTotal') || 0);
+    var currency = (details && details.currency) || 'USD';
+    var contents = (details && details.contents) || [{ id:'tirz-vial', quantity: 1, item_price: 90 }];
+    var order_id = (details && details.orderId) || null;
 
-    fbqSafe('Purchase', params);
+    // stable session
+    var sessKey = 'co_sess';
+    var sess = sessionStorage.getItem(sessKey);
+    if (!sess) { sess = Math.random().toString(36).slice(2) + Date.now(); sessionStorage.setItem(sessKey, sess); }
+    var event_id = 'Purchase::' + sess;
+
+    fbqSafe('Purchase', { value: value, currency: currency, contents: contents, order_id: order_id, event_id: event_id });
+
     try {
-      await fetch('/api/meta/capi', {
+      await fetch('/api/meta/capi.js', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ event:'Purchase', value, currency, contents, order_id, event_id })
+        body: JSON.stringify({ event: 'Purchase', event_id, value, currency, contents, order_id }),
+        keepalive:true
       });
     } catch(_) {}
     return event_id;
