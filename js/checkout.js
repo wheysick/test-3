@@ -118,7 +118,7 @@
     let first = fIn, last = lIn;
     const full = (fullRaw||'').trim();
     if ((!first || !last) && full){
-      const parts = full.split(/\s+/);
+      const parts = full.split(/\\s+/);
       if (parts.length > 1){ last = parts.pop(); first = parts.join(' '); }
       else { if (!first) first = full; if (!last) last = full; }
     }
@@ -412,4 +412,78 @@ const token = await window.RecurlyUI.tokenize({
     };
     return Object.assign(base, overrides||{});
   }
+})();
+// ===== CAPI Relay Add-on (v12 merge) =====
+;(function(){
+  'use strict';
+  const STORE = 'co_evt_seen_v12';
+  const sessKey = 'co_sess_v12';
+  const sessionId = (function(){
+    let v = sessionStorage.getItem(sessKey);
+    if (!v) { v = Math.random().toString(36).slice(2) + Date.now(); sessionStorage.setItem(sessKey, v); }
+    return v;
+  })();
+
+  function seen(k){ try{ const m = JSON.parse(sessionStorage.getItem(STORE)||'{}'); return !!m[k]; }catch(e){ return false; } }
+  function markSeen(k){ try{ const m=JSON.parse(sessionStorage.getItem(STORE)||'{}'); m[k]=1; sessionStorage.setItem(STORE, JSON.stringify(m)); }catch(e){} }
+
+  function readCookie(name){
+    const m = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+  }
+  function getFBP(){ return readCookie('_fbp'); }
+  function getFBC(){
+    const c = readCookie('_fbc'); if (c) return c;
+    const p = new URLSearchParams(location.search);
+    const fbclid = p.get('fbclid');
+    return fbclid ? ('fb.1.' + Date.now() + '.' + fbclid) : '';
+  }
+  async function sha256Hex(str){
+    const enc = new TextEncoder().encode(str);
+    const hashBuf = await crypto.subtle.digest('SHA-256', enc);
+    const arr = Array.from(new Uint8Array(hashBuf), b => b.toString(16).padStart(2,'0'));
+    return arr.join('');
+  }
+
+  async function capiPost(eventName, eventId, params){
+    try{
+      // Pull contact data from existing step1 getters in your file
+      const email = (document.querySelector('[name="email"],#email')?.value||'').toLowerCase().trim();
+      const phone = (document.querySelector('[name="phone"],#phone')?.value||'').replace(/[^0-9+]/g,'');
+
+      const user_data = {};
+      if (email) user_data.em = await sha256Hex(email);
+      if (phone) user_data.ph = await sha256Hex(phone);
+      const fbp = getFBP(); if (fbp) user_data.fbp = fbp;
+      const fbc = getFBC(); if (fbc) user_data.fbc = fbc;
+
+      const payload = {
+        event_name: eventName,
+        event_id: eventId,
+        event_time: Math.floor(Date.now()/1000),
+        action_source: 'website',
+        event_source_url: location.href,
+        user_data,
+        custom_data: {
+          currency: (params && params.currency) || 'USD',
+          value: typeof params?.value === 'number' ? params.value : (params && Number(params.total)) || 0,
+          contents: params?.contents || [{ id:'tirz-vial', quantity: (window.qty||1), item_price: (window.PRICE||90) }],
+          content_type: 'product'
+        }
+      };
+
+      await fetch('/api/meta/capi.js', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload), keepalive:true });
+    }catch(err){ console.warn('[capi] relay failed', err); }
+  }
+
+  // Replace global fbqSafe to also relay CAPI with dedupe
+  const _origFbqSafe = window.fbqSafe;
+  window.fbqSafe = function(event, params, opts){
+    try{ if (window.fbq) window.fbq('track', event, params||{}, opts||{}); }catch{}
+    const eventId = (event + '::' + sessionId);
+    if (!seen(event)){
+      markSeen(event);
+      capiPost(event, eventId, params||{});
+    }
+  };
 })();
