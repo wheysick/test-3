@@ -107,20 +107,3 @@ module.exports = async (req, res) => {
     });
   }
 };
-
-// Replace with your real Recurly server-side charge; this stub simply returns OK for flow testing.
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
-  try {
-    const { token, customer, items } = await readJson(req);
-    if (!token) return res.status(400).json({ error: 'Missing token' });
-    // TODO: call your processor / Recurly API with 'token' and 'customer'
-    console.log('[recurly:charge]', { token, customer, items });
-    res.status(200).json({ ok:true, id:'stub_txn_123' });
-  } catch (e) {
-    res.status(500).json({ error: e.message || 'Server error' });
-  }
-}
-async function readJson(req){ if (req.body && typeof req.body==='object') return req.body;
-  let s=''; for await (const c of req) s+=c; return s?JSON.parse(s):{}; }
-
