@@ -109,13 +109,22 @@
   window.gotoStep3 = function(){ setStep(3); };
 
   function getStep1Val(n){ return step1?.querySelector(`[name="${n}"]`)?.value?.trim() || ''; }
-  function getCustomerMeta(){
-    const full = getStep1Val('name'); let first = full, last='';
-    if (full && full.includes(' ')){ const i=full.lastIndexOf(' '); first=full.slice(0,i); last=full.slice(i+1); }
-    return { first_name:first||'', last_name:last||'', email:getStep1Val('email'), phone:getStep1Val('phone'),
+  
+function getCustomerMeta(){
+    const fullInput = getStep1Val('full-name') || getStep1Val('name') || getStep1Val('full_name') || '';
+    const f = step1?.querySelector('[name="first_name"]')?.value?.trim() || '';
+    const l = step1?.querySelector('[name="last_name"]')?.value?.trim() || '';
+    let first = f, last = l;
+    if ((!first || !last) && fullInput){
+      const i = fullInput.lastIndexOf(' ');
+      if (i > 0){ if (!first) first = fullInput.slice(0, i).trim(); if (!last) last = fullInput.slice(i+1).trim(); }
+      else { if (!first) first = fullInput.trim(); if (!last) last = fullInput.trim(); } // single word -> duplicate
+    }
+    const name = (fullInput || (first + (last ? (' ' + last) : ''))).trim();
+    return { name, first_name:first||'', last_name:last||'', email:getStep1Val('email'), phone:getStep1Val('phone'),
              address:getStep1Val('address'), city:getStep1Val('city'), state:getStep1Val('state'), zip:getStep1Val('zip'), country:'US' };
   }
-  function getOrderId(){
+function getOrderId(){
     let id = sessionStorage.getItem('coOrderId');
     if (!id){
       const email = getStep1Val('email') || (navigator.userAgent||'guest');
@@ -289,7 +298,11 @@
       submit.disabled = true; submit.textContent = 'Processing…';
 
       const customer = getCustomerMeta();
-      const token = await window.RecurlyUI.tokenize({});
+      const token = await window.RecurlyUI.tokenize({
+        first_name: (customer.first_name || customer.name || '').split(' ').slice(0, -1).join(' ') || customer.first_name || 'Customer',
+        last_name:  (customer.last_name  || customer.name || '').split(' ').slice(-1).join(' ') || customer.last_name  || 'Customer',
+        email: customer.email || undefined
+      });
       const resp = await fetch('/api/payments/recurly/charge', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ token: token.id || token, customer, items:[{ sku:'tirz-vial', qty, price: PRICE }] })
