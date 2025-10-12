@@ -177,5 +177,6 @@ legend{opacity:.9; padding:0 6px}
   border:1px solid var(--border); background:rgba(255,255,255,.04); border-radius:12px; min-height:46px; padding:8px 10px;
 }
 
+.faq, .reviews-col { content-visibility: auto; contain-intrinsic-size: 1px 800px; }
 .actions{position:sticky; bottom:0; display:flex; justify-content:center; gap:10px; padding:12px; background:linear-gradient(180deg,rgba(15,19,25,0),rgba(15,19,25,.9))}
 .secure{text-align:center; opacity:.85; font-size:13px}
