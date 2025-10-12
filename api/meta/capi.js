@@ -15,30 +15,29 @@ export default async function handler(req, res) {
 
     // Expected fields from the client
     const {
-      // Required for meaningful event
-      event,                 // e.g. 'InitiateCheckout', 'AddPaymentInfo', 'Purchase'
-      event_id,              // the SAME ID you sent with the browser pixel (for dedupe)
+      event,                 // 'InitiateCheckout' | 'AddPaymentInfo' | 'Purchase' | ...
+      event_id,              // SAME value sent with browser pixel (for dedupe)
 
-      // Common commerce fields
+      // Commerce data
       value = 0,
       currency = 'USD',
       contents = [],         // [{ id, quantity, item_price }]
       order_id = null,
       content_name,
       content_category,
-      content_type,          // e.g. 'product'
+      content_type,
       num_items,
 
-      // Match-quality helpers (optional but recommended)
-      email,                 // raw email; we hash to SHA-256
-      phone,                 // raw phone; we normalize then hash
-      fbp,                   // _fbp cookie value
-      fbc,                   // _fbc cookie value
+      // Match-quality helpers
+      email,                 // raw; will be SHA-256 hashed
+      phone,                 // raw; will be normalized + hashed
+      fbp,                   // _fbp cookie
+      fbc,                   // _fbc cookie
 
-      // Overrides (optional)
-      client_ip_address,     // if you want to provide explicitly
-      client_user_agent,     // if you want to provide explicitly
-      event_source_url,      // override Referer if needed
+      // Optional overrides
+      client_ip_address,
+      client_user_agent,
+      event_source_url,
 
       // Testing
       test_event_code
@@ -66,7 +65,6 @@ export default async function handler(req, res) {
     const crypto = await import('crypto');
     const sha256 = (s) =>
       crypto.createHash('sha256').update(String(s || '').trim().toLowerCase()).digest('hex');
-
     const normPhone = (p) => String(p || '').replace(/[^\d+]/g, '');
 
     const user_data = {
@@ -78,7 +76,7 @@ export default async function handler(req, res) {
     if (fbp) user_data.fbp = fbp;
     if (fbc) user_data.fbc = fbc;
 
-    // Build custom_data
+    // Build custom_data (strip undefined)
     const custom_data = {
       value,
       currency,
@@ -89,14 +87,12 @@ export default async function handler(req, res) {
       content_type,
       num_items
     };
-    // Strip undefined to keep payload clean
     Object.keys(custom_data).forEach((k) => custom_data[k] === undefined && delete custom_data[k]);
 
-    // Build the server event
     const serverEvent = {
       event_name: event,
       event_time: Math.floor(Date.now() / 1000),
-      event_id, // may be undefined; dedupe works when present
+      event_id,
       action_source: 'website',
       event_source_url: event_source_url || req.headers.referer || undefined,
       user_data,
@@ -118,12 +114,10 @@ export default async function handler(req, res) {
     });
 
     if (!fb.ok) {
-      // Bubble up the exact FB error response to aid diagnostics
       const text = await fb.text().catch(() => '');
       return res.status(fb.status).send(text || 'CAPI error');
     }
 
-    // All good — no body needed
     return res.status(204).end();
   } catch (err) {
     return res.status(500).json({ error: 'CAPI handler failed' });
@@ -136,9 +130,5 @@ async function readJson(req) {
   let s = '';
   for await (const chunk of req) s += chunk;
   if (!s) return {};
-  try {
-    return JSON.parse(s);
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(s); } catch { return {}; }
 }
