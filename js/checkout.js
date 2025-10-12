@@ -1,7 +1,12 @@
-// ===== checkout.js — v10.11.2+namefix HOTFIX (quote fix for "we'll"/"you'll") =====
+// ===== checkout.js — v10.11.6 (FULL) =====
+// - Step-state Meta Pixel firing (ATC/IC/API)
+// - Recurly tokenize meta: first/last/email + address1/city/state/postal_code/country
+// - Supports Full Name (name="full-name") or split first/last
+// - Preserves Cash App / Crypto flows and original UI
+
 (function(){
-  const $  = (s, r=document) => r.querySelector(s);
-  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const $  = (s, r=document) => (r||document).querySelector(s);
+  const $$ = (s, r=document) => Array.from((r||document).querySelectorAll(s));
 
   const modal   = $('#checkoutModal'); if (!modal) return;
   const step1   = $('#coStep1');
@@ -15,36 +20,11 @@
   const cardset = $('#coCardPane');
   const altPane = $('#coAltPane');
 
-  // Always open checkout on any .open-checkout (capture beats others)
-  document.addEventListener('click', function(e){
-    const a = e.target.closest && e.target.closest('.open-checkout');
-    if (!a) return;
-    e.preventDefault();
-    checkoutOpen();
-    // Pixel: AddToCart
-    fbqSafe('AddToCart', pixelCartData({ value: (qty||1) * (PRICE||90) }));
-  }, true);
-
-  if (close) close.addEventListener('click', (e)=>{ e.preventDefault(); checkoutClose(); });
-  document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && modal.classList.contains('show')) checkoutClose(); }, true);
-  modal.addEventListener('click', (e)=>{ if (e.target === modal) checkoutClose(); });
-  modal.addEventListener('click', function(e){
-    const g2 = e.target.closest && e.target.closest('#coToStep2, [data-goto-step="2"]');
-    if (g2){ e.preventDefault(); setStep(2); return; }
-    const g3 = e.target.closest && e.target.closest('#coToStep3, [data-goto-step="3"]');
-    if (g3){ e.preventDefault(); setStep(3); return; }
-  }, true);
-  modal.addEventListener('submit', (e)=>{ if (modal.contains(e.target)) e.preventDefault(); }, true);
-  step1 && step1.addEventListener('submit', (e)=>{ e.preventDefault(); setStep(2);
-    // Pixel: InitiateCheckout
-    fbqSafe('InitiateCheckout', pixelCartData({ num_items: qty }));
-  }, true);
-
   // ===== pricing
   const PRICE = 90.00, TAX_RATE = 0.0874, ALT_DISC_RATE = 0.15;
   const qtyInput = $('#coQty');
   const elItems = $('#coItems'), elMerch = $('#coMerch'), elMethod = $('#coMethod');
-  const elTax = $('#coTax'), elShip = $('#coShip'), elTotal = $('#coTotal');
+  const elTax   = $('#coTax'),   elShip  = $('#coShip'),  elTotal  = $('#coTotal');
   let qty = 1, payMethod = 'card'; // card | paypal | venmo | cashapp | crypto
 
   const fmt = n => '$' + Number(n).toFixed(2);
@@ -69,8 +49,9 @@
   qtyInput && qtyInput.addEventListener('input', ()=>{ const v=parseInt(qtyInput.value.replace(/[^0-9]/g,''),10); setQty(isNaN(v)?1:v); });
   $$('.qty-inc').forEach(b => b.addEventListener('click', ()=> setQty(qty+1)));
   $$('.qty-dec').forEach(b => b.addEventListener('click', ()=> setQty(qty-1)));
+  updateTotals();
 
-  // ===== payment method selection (parity with v10.6)
+  // ===== payment method selection
   const payButtons = {
     card:   $('#pmCard'), paypal: $('#pmPayPal'), venmo: $('#pmVenmo'),
     cashapp:$('#pmCashApp'), crypto: $('#pmCrypto')
@@ -91,34 +72,28 @@
   if (payButtons.card){   payButtons.card.addEventListener('click', ()=> selectMethod('card'));   payButtons.card.addEventListener('dblclick', ()=>{ selectMethod('card'); setStep(3); }); }
   if (payButtons.cashapp){payButtons.cashapp.addEventListener('click', ()=> selectMethod('cashapp'));payButtons.cashapp.addEventListener('dblclick', ()=>{ selectMethod('cashapp'); setStep(3); }); }
   if (payButtons.crypto){ payButtons.crypto.addEventListener('click', ()=> selectMethod('crypto')); payButtons.crypto.addEventListener('dblclick', ()=>{ selectMethod('crypto'); setStep(3); }); }
-  updateTotals();
 
-  // ===== step switching
+  // ===== pixel helpers + guards
+  let __px = { atc:false, ic:false, api:false };
+  function fbqSafe(event, params, opts){ try{ if (window.fbq) window.fbq('track', event, params||{}, opts||{}); }catch{} }
+  function pixelCartData(overrides){
+    const t = computeTotals?.() || { total: 0 };
+    const base = {
+      value: t.total || (qty * PRICE), currency:'USD',
+      contents:[{ id:'tirz-vial', quantity: qty, item_price: PRICE }],
+      content_type:'product'
+    };
+    return Object.assign(base, overrides||{});
+  }
+
+  // ===== step switching (state-based pixel firing)
   function currentStep(){ if (step3 && !step3.hidden) return 3; if (step2 && !step2.hidden) return 2; return 1; }
   function setStep(n){
-  // Pixel fires at step transitions
-  try {
-    if (typeof window.fbqSafe === 'function') {
-      if (n === 2) {
-        window.fbqSafe('InitiateCheckout', {
-          value: (typeof computeTotals === 'function' ? computeTotals().total : 90),
-          currency: 'USD',
-          contents: [{ id:'tirz-vial', quantity: 1, item_price: 90 }],
-          content_type: 'product'
-        });
-      }
-      if (n === 3) {
-        window.fbqSafe('AddPaymentInfo', {
-          value: (typeof computeTotals === 'function' ? computeTotals().total : 90),
-          currency: 'USD',
-          contents: [{ id:'tirz-vial', quantity: 1, item_price: 90 }],
-          content_type: 'product'
-        });
-      }
-    }
-  } catch(_){}
-
     [step1, step2, step3].forEach((el,i)=>{ if (!el) return; const on=(i===n-1); el.hidden=!on; el.setAttribute('aria-hidden', String(!on)); });
+
+    if (n===2 && !__px.ic){ __px.ic = true; fbqSafe('InitiateCheckout', pixelCartData({ num_items: qty })); }
+    if (n===3 && !__px.api){ __px.api = true; fbqSafe('AddPaymentInfo', pixelCartData({ payment_method: payMethod })); }
+
     if (n===3){
       renderStep3UI();
       if (payMethod === 'card') { window.RecurlyUI?.mount(); } else { window.RecurlyUI?.unmount(); }
@@ -130,35 +105,40 @@
   window.gotoStep2 = function(){ setStep(2); };
   window.gotoStep3 = function(){ setStep(3); };
 
-  function getStep1Val(n){ return step1?.querySelector(`[name="${n}"]`)?.value?.trim() || ''; }
+  // ===== modal open/close
+  window.checkoutOpen = function(){ 
+    modal.classList.add('show'); modal.style.display='grid';
+    document.documentElement.setAttribute('data-checkout-open','1'); document.body.style.overflow='hidden';
+    setStep(1); startStock();
+    if (!__px.atc){ __px.atc = true; fbqSafe('AddToCart', pixelCartData({ value: (qty||1) * PRICE })); }
+  };
+  window.checkoutClose = function(){ 
+    modal.classList.remove('show'); modal.style.display='none';
+    document.documentElement.removeAttribute('data-checkout-open'); document.body.style.overflow='';
+    stopStock(); __px = { atc:false, ic:false, api:false };
+  };
+  window.checkoutBack  = function(){ const s=currentStep(); setStep(s===3?2:1); };
 
-  // ===== MODIFIED: robust Full Name support (name="full-name" or "name" or split fields)
+  // ===== step 1 helpers
+  function getStep1Val(n){ return step1?.querySelector(`[name="${n}"]`)?.value?.trim() || ''; }
   function getCustomerMeta(){
     const fullRaw = getStep1Val('full-name') || getStep1Val('name') || getStep1Val('full_name') || '';
-    const fIn = getStep1Val('first_name');
-    const lIn = getStep1Val('last_name');
-    let first = fIn, last = lIn;
+    let first = getStep1Val('first_name'), last = getStep1Val('last_name');
     const full = (fullRaw||'').trim();
     if ((!first || !last) && full){
-      const parts = full.split(/\\s+/);
+      const parts = full.split(/\s+/);
       if (parts.length > 1){ last = parts.pop(); first = parts.join(' '); }
       else { if (!first) first = full; if (!last) last = full; }
     }
     const name = (full || [first,last].filter(Boolean).join(' ')).trim();
     return {
-      name, // helps server split if it prefers a single field
-      first_name:first||'',
-      last_name:last||'',
-      email:getStep1Val('email'),
-      phone:getStep1Val('phone'),
-      address:getStep1Val('address'),
-      city:getStep1Val('city'),
-      state:getStep1Val('state'),
-      zip:getStep1Val('zip'),
-      country:'US'
+      name, first_name:first||'', last_name:last||'',
+      email:getStep1Val('email'), phone:getStep1Val('phone'),
+      address:getStep1Val('address'), city:getStep1Val('city'),
+      state:getStep1Val('state'), zip:getStep1Val('zip'),
+      country:(getStep1Val('country')||'US').toUpperCase()
     };
   }
-
   function getOrderId(){
     let id = sessionStorage.getItem('coOrderId');
     if (!id){
@@ -290,7 +270,11 @@
       $$('.copy-btn', altPane).forEach(btn=>{
         btn.addEventListener('click', async ()=>{
           const val = btn.getAttribute('data-copy') || '';
-          try{ await navigator.clipboard?.writeText(val); btn.textContent='✓ Copied'; btn.disabled=true; setTimeout(()=>{ btn.textContent=btn.textContent.includes('Amount')?('📋 Copy Amount '+amount):btn.textContent.includes('Cashtag')?'$ Copy Cashtag':'🧾 Copy Order #'; btn.disabled=false; },1200);}catch(_){ window.prompt('Copy to clipboard:', val); }
+          try{ await navigator.clipboard?.writeText(val); btn.textContent='✓ Copied'; btn.disabled=true; setTimeout(()=>{
+            btn.textContent = btn.textContent.includes('Amount') ? ('📋 Copy Amount '+amount) :
+                              (btn.textContent.includes('Cashtag') ? '$ Copy Cashtag' : '🧾 Copy Order #');
+            btn.disabled=false; },1200);
+          }catch(_){ window.prompt('Copy to clipboard:', val); }
         });
       });
       const markBtn = $('#markPaidBtn');
@@ -306,7 +290,6 @@
             body: JSON.stringify({ order_id: oid, method:'cashapp', cashtag:'$selfhacking', amount:t.total, qty, email: customer.email||'', meta: customer, ts: Date.now() })
           });
           if(!r.ok){ const err=await r.json().catch(()=>({})); throw new Error(err?.error || `HTTP ${r.status}`); }
-          // redirect to thank-you (pending)
           window.location.href = `/thank-you.html?m=cashapp&status=pending&order=${encodeURIComponent(oid)}`;
         }catch(e){ alert(e?.message || 'Could not mark as paid'); markBtn.disabled=false; }
       });
@@ -324,7 +307,7 @@
     }catch(e){}
   }
 
-  // Submit (card only) -> after success redirect to thank-you (Purchase fired there)
+  // ===== Submit (card only)
   submit && submit.addEventListener('click', async (e)=>{
     e.preventDefault();
     try {
@@ -333,30 +316,30 @@
       submit.disabled = true; submit.textContent = 'Processing…';
 
       const customer = getCustomerMeta();
+      const fn = customer.first_name || (customer.name||'').split(' ').slice(0,-1).join(' ') || customer.name || 'Customer';
+      const ln = customer.last_name  || (customer.name||'').split(' ').slice(-1).join(' ') || customer.name || 'Customer';
 
-// ===== MODIFIED: pass names + full billing address into Recurly tokenization
-const fn = customer.first_name || (customer.name||'').split(' ').slice(0,-1).join(' ') || customer.name || 'Customer';
-const ln = customer.last_name  || (customer.name||'').split(' ').slice(-1).join(' ') || customer.name || 'Customer';
-
-const token = await window.RecurlyUI.tokenize({
-  first_name: fn,
-  last_name:  ln,
-  email:       customer.email || undefined,
-  address1:    customer.address || undefined, // REQUIRED by your site settings
-  city:        customer.city    || undefined, // REQUIRED
-  state: customer.state || undefined,
-  postal_code: customer.zip     || undefined, // REQUIRED
-  country:    (customer.country || 'US').toUpperCase() // ISO-2; defaults to US
-});
-
+      // Site requires address on tokenization
+      const token = await window.RecurlyUI.tokenize({
+        first_name: fn,
+        last_name:  ln,
+        email:      customer.email || undefined,
+        address1:   customer.address || undefined,
+        city:       customer.city || undefined,
+        state:      customer.state || undefined,    // your site expects "state", not "region"
+        postal_code:customer.zip || undefined,
+        country:    (customer.country || 'US').toUpperCase()
+      });
 
       const resp = await fetch('/api/payments/recurly/charge', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        // include 'name' along with split fields for server-side convenience
         body: JSON.stringify({ token: token.id || token, customer, items:[{ sku:'tirz-vial', qty, price: PRICE }] })
       });
       let data=null; try{ data=await resp.json(); }catch(_){}
-      if(!resp.ok){ const reasons = Array.isArray(data?.errors) ? `\n• ${data.errors.join('\n• ')}` : ''; throw new Error((data?.error || `Payment failed (HTTP ${resp.status})`) + reasons); }
+      if(!resp.ok){
+        const reasons = Array.isArray(data?.errors) ? `\n• ${data.errors.join('\n• ')}` : '';
+        throw new Error((data?.error || `Payment failed (HTTP ${resp.status})`) + reasons);
+      }
 
       // Stash values for thank-you
       const t = computeTotals(); const oid = getOrderId();
@@ -372,7 +355,7 @@ const token = await window.RecurlyUI.tokenize({
     }
   });
 
-  // Stock countdown
+  // ===== Stock countdown (unchanged)
   const STOCK_START=47, STOCK_END=1, STOCK_MS=5*60*1000;
   let stockTimer=null, stockT0=null; const STOCK_KEY='coStockT0_v1';
   function stockNow(){
@@ -388,27 +371,9 @@ const token = await window.RecurlyUI.tokenize({
     renderStock(); stockTimer=setInterval(()=>{ renderStock(); if (stockNow()<=STOCK_END){ clearInterval(stockTimer); stockTimer=null; }},1000); }
   function stopStock(){ if (stockTimer){ clearInterval(stockTimer); stockTimer=null; } }
 
-  window.checkoutOpen = function(){
-  try {
-    if (typeof window.fbqSafe === 'function') {
-      window.fbqSafe('AddToCart', {
-        value: (typeof computeTotals === 'function' ? computeTotals().total : 90),
-        currency: 'USD',
-        contents: [{ id:'tirz-vial', quantity: 1, item_price: 90 }],
-        content_type: 'product'
-      });
-    }
-  } catch(_){}
- modal.classList.add('show'); modal.style.display='grid';
-    document.documentElement.setAttribute('data-checkout-open','1'); document.body.style.overflow='hidden'; setStep(1); startStock(); };
-  window.checkoutClose = function(){ modal.classList.remove('show'); modal.style.display='none';
-    document.documentElement.removeAttribute('data-checkout-open'); document.body.style.overflow=''; stopStock(); };
-  window.checkoutBack  = function(){ const s=currentStep(); setStep(s===3?2:1); };
-  window._debugSetStep = setStep;
-
   // ===== save-on-change (Step 1)
   (function(){
-    const fields = ['name','full-name','email','phone','address','city','state','zip'];
+    const fields = ['name','full-name','email','phone','address','city','state','zip','country'];
     function save(){ if(!step1) return; const data={}; fields.forEach(n=> data[n] = step1.querySelector(`[name="${n}"]`)?.value?.trim()||'');
       localStorage.setItem('coStep1', JSON.stringify(data)); }
     function load(){ try{ const d=JSON.parse(localStorage.getItem('coStep1')||'{}');
@@ -416,121 +381,4 @@ const token = await window.RecurlyUI.tokenize({
     load(); step1?.addEventListener('input', save);
   })();
 
-  // ===== lightweight tracking beacons
-  function track(name, data){ try{
-    navigator.sendBeacon?.('/_track', new Blob([JSON.stringify({name, ts:Date.now(), ...data})], {type:'application/json'}));
-  } catch{} }
-  document.getElementById('coToStep2')?.addEventListener('click', ()=>track('co_step2',{}));
-  document.getElementById('coToStep3')?.addEventListener('click', ()=>{
-    // Pixel: AddPaymentInfo at step-2 continue (we also do it in crypto/cashapp handlers)
-    fbqSafe('AddPaymentInfo', pixelCartData({ payment_method: payMethod }));
-    const t=computeTotals(); sessionStorage.setItem('coLastTotal', String(t.total));
-    sessionStorage.setItem('coLastQty', String(qty)); sessionStorage.setItem('coLastOrderId', getOrderId());
-    track('co_step3',{method: document.querySelector('[aria-selected="true"]')?.id||'card'});
-  });
-  document.getElementById('coSubmit')?.addEventListener('click', ()=>track('co_submit',{ method:'card' }));
-
-  // ===== exit guard
-  function isDirtyStep1(){ const names=['name','full-name','email','phone','address','city','state','zip'];
-    return names.some(n => (step1?.querySelector(`[name="${n}"]`)?.value||'').trim().length>0); }
-  const origClose = window.checkoutClose; window.checkoutClose = function(){ if (isDirtyStep1() && !confirm('Leave checkout? Your info will be saved.')) return; origClose(); };
-
-  // ===== Pixel helpers
-  function fbqSafe(event, params, opts){
-    try{
-      if (window.fbq) {
-        var hasPixel = !!(fbq.getState && (fbq.getState().pixels||[]).length);
-        if (!hasPixel) fbq('init', '1051611783243364');
-        fbq('trackSingle', '1051611783243364', event, params||{}, opts||{});
-      }
-    }catch{}
-  }
-  function pixelCartData(overrides){
-    const t = computeTotals?.() || { total: 0 }; const base = {
-      value: t.total, currency:'USD',
-      contents:[{ id:'tirz-vial', quantity: qty, item_price: PRICE }],
-      content_type:'product'
-    };
-    return Object.assign(base, overrides||{});
-  }
-})();
-// ===== CAPI Relay Add-on (v12 merge) =====
-;(function(){
-  'use strict';
-  const STORE = 'co_evt_seen_v12';
-  const sessKey = 'co_sess_v12';
-  const sessionId = (function(){
-    let v = sessionStorage.getItem(sessKey);
-    if (!v) { v = Math.random().toString(36).slice(2) + Date.now(); sessionStorage.setItem(sessKey, v); }
-    return v;
-  })();
-
-  function seen(k){ try{ const m = JSON.parse(sessionStorage.getItem(STORE)||'{}'); return !!m[k]; }catch(e){ return false; } }
-  function markSeen(k){ try{ const m=JSON.parse(sessionStorage.getItem(STORE)||'{}'); m[k]=1; sessionStorage.setItem(STORE, JSON.stringify(m)); }catch(e){} }
-
-  function readCookie(name){
-    const m = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
-    return m ? m.pop() : '';
-  }
-  function getFBP(){ return readCookie('_fbp'); }
-  function getFBC(){
-    const c = readCookie('_fbc'); if (c) return c;
-    const p = new URLSearchParams(location.search);
-    const fbclid = p.get('fbclid');
-    return fbclid ? ('fb.1.' + Date.now() + '.' + fbclid) : '';
-  }
-  async function sha256Hex(str){
-    const enc = new TextEncoder().encode(str);
-    const hashBuf = await crypto.subtle.digest('SHA-256', enc);
-    const arr = Array.from(new Uint8Array(hashBuf), b => b.toString(16).padStart(2,'0'));
-    return arr.join('');
-  }
-
-  async function capiPost(eventName, eventId, params){
-    try{
-      // Pull contact data from existing step1 getters in your file
-      const email = (document.querySelector('[name="email"],#email')?.value||'').toLowerCase().trim();
-      const phone = (document.querySelector('[name="phone"],#phone')?.value||'').replace(/[^0-9+]/g,'');
-
-      const user_data = {};
-      if (email) user_data.em = await sha256Hex(email);
-      if (phone) user_data.ph = await sha256Hex(phone);
-      const fbp = getFBP(); if (fbp) user_data.fbp = fbp;
-      const fbc = getFBC(); if (fbc) user_data.fbc = fbc;
-
-      const payload = {
-        event_name: eventName,
-        event_id: eventId,
-        event_time: Math.floor(Date.now()/1000),
-        action_source: 'website',
-        event_source_url: location.href,
-        user_data,
-        custom_data: {
-          currency: (params && params.currency) || 'USD',
-          value: typeof params?.value === 'number' ? params.value : (params && Number(params.total)) || 0,
-          contents: params?.contents || [{ id:'tirz-vial', quantity: (window.qty||1), item_price: (window.PRICE||90) }],
-          content_type: 'product'
-        }
-      };
-
-      await fetch('/api/meta/capi.js', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload), keepalive:true });
-    }catch(err){ console.warn('[capi] relay failed', err); }
-  }
-
-  // Replace global fbqSafe to also relay CAPI with dedupe
-  const _origFbqSafe = window.fbqSafe;
-  window.fbqSafe = function(event, params, opts){
-    try{
-      if (window.fbq) {
-        var hasPixel = !!(fbq.getState && (fbq.getState().pixels||[]).length);
-        if (!hasPixel) fbq('init', '1051611783243364');
-        fbq('trackSingle', '1051611783243364', event, params||{}, opts||{});
-      }
-    }catch{}
-    const eventId = (event + '::' + sessionId);
-    if (!seen(event)){
-      markSeen(event);
-      capiPost(event, eventId, params||{});
-    }
-  };
 })();
