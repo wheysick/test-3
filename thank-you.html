@@ -39,23 +39,28 @@
         fbqSafe('Purchase', { value: total, currency:'USD', contents, content_type:'product', order_id: orderId });
       }
     })();
-
-    // /thank-you.html
-// read from sessionStorage (already set in checkout.js)
-const total = Number(sessionStorage.getItem('coLastTotal') || '0');
-const qty   = Number(sessionStorage.getItem('coLastQty') || '1');
-const order = sessionStorage.getItem('coLastOrderId') || undefined;
-pixel.track('Purchase', {
-  value: total,
-  currency: 'USD',
-  contents: [{ id: 'tirz-vial', quantity: qty, item_price: 90.00 }],
-  content_type: 'product',
-  order_id: order,
-  // include email if you saved it to sessionStorage at Step 2/3
-email: sessionStorage.getItem('coLastEmail')
-|| (JSON.parse(localStorage.getItem('coStep1') || '{}').email || undefined)
-});
-
   </script>
+<script>
+  // after loading /js/pixel.js and reading sessionStorage
+  const params = new URLSearchParams(location.search);
+  const method = (params.get('m') || '').toLowerCase();   // 'card' | 'cashapp' | 'crypto' | ...
+  const status = (params.get('status') || 'paid').toLowerCase();
+
+  const shouldFirePurchase =
+    method === 'card' || status === 'paid'; // only record when actually paid
+
+  if (shouldFirePurchase) {
+    // current code constructing total/qty/order/email…
+    pixel.track('Purchase', {
+      value: total,
+      currency: 'USD',
+      contents: [{ id: 'tirz-vial', quantity: qty, item_price: 90.00 }],
+      content_type: 'product',
+      order_id: order,
+      email: sessionStorage.getItem('coLastEmail')
+             || (JSON.parse(localStorage.getItem('coStep1') || '{}').email || undefined)
+    });
+  }
+</script>
 </body>
 </html>
