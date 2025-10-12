@@ -91,8 +91,11 @@
   function setStep(n){
     [step1, step2, step3].forEach((el,i)=>{ if (!el) return; const on=(i===n-1); el.hidden=!on; el.setAttribute('aria-hidden', String(!on)); });
 
-    if (n===2 && !__px.ic){ __px.ic = true; pixel.track('InitiateCheckout', pixelCartData({ num_items: qty })); }
-    if (n===3 && !__px.api){ __px.api = true; pixel.track('AddPaymentInfo', pixelCartData({ payment_method: payMethod })); }
+if (n===2 && !__px.ic){ __px.ic = true; pixel.track('InitiateCheckout', pixelCartData({ num_items: qty, email: getCustomerMeta().email || undefined })); }
+if (n===3 && payMethod === 'card' && !__px.api) {
+__px.api = true;
+pixel.track('AddPaymentInfo', pixelCartData({ payment_method: 'card', email: getCustomerMeta().email || undefined }));
+}
 
     if (n===3){
       renderStep3UI();
@@ -244,7 +247,8 @@
             });
             const d = await resp.json().catch(()=>null);
             if (!resp.ok || !d?.hosted_url) throw new Error(d?.error || `Charge creation failed (HTTP ${resp.status})`);
-            pixel.track('AddPaymentInfo', pixelCartData({ payment_method: 'crypto' }));
+if (!__px.api) { __px.api = true; }
+pixel.track('AddPaymentInfo', pixelCartData({ payment_method: 'crypto', email: customer.email || undefined }));
             window.location.href = d.hosted_url;
           } catch (err) {
             alert(err?.message || 'Crypto checkout failed');
@@ -259,7 +263,9 @@
           sessionStorage.setItem('coLastTotal', String(t.total));
           sessionStorage.setItem('coLastQty', String(qty));
           sessionStorage.setItem('coLastOrderId', orderId);
-          pixel.track('AddPaymentInfo', pixelCartData({ payment_method: 'cashapp' }));
+altPrimary.disabled = true;
+if (!__px.api) { __px.api = true; }
+pixel.track('AddPaymentInfo', pixelCartData({ payment_method: 'cashapp', email: (getCustomerMeta().email || undefined) }));
           const cashUrl = `https://cash.app/$${cashtag}?amount=${encodeURIComponent(t.total.toFixed(2))}&note=${encodeURIComponent(orderId)}`;
           window.open(cashUrl,'_blank','noopener');
         }
