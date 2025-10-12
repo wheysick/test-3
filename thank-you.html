@@ -52,7 +52,8 @@ pixel.track('Purchase', {
   content_type: 'product',
   order_id: order,
   // include email if you saved it to sessionStorage at Step 2/3
-  email: sessionStorage.getItem('coLastEmail') || undefined
+email: sessionStorage.getItem('coLastEmail')
+|| (JSON.parse(localStorage.getItem('coStep1') || '{}').email || undefined)
 });
 
   </script>
