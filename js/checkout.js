@@ -91,8 +91,8 @@
   function setStep(n){
     [step1, step2, step3].forEach((el,i)=>{ if (!el) return; const on=(i===n-1); el.hidden=!on; el.setAttribute('aria-hidden', String(!on)); });
 
-    if (n===2 && !__px.ic){ __px.ic = true; fbq('InitiateCheckout', pixelCartData({ num_items: qty })); }
-    if (n===3 && !__px.api){ __px.api = true; fbq('AddPaymentInfo', pixelCartData({ payment_method: payMethod })); }
+    if (n===2 && !__px.ic){ __px.ic = true; pixel.track('InitiateCheckout', pixelCartData({ num_items: qty })); }
+    if (n===3 && !__px.api){ __px.api = true; pixel.track('AddPaymentInfo', pixelCartData({ payment_method: payMethod })); }
 
     if (n===3){
       renderStep3UI();
@@ -110,7 +110,7 @@
     modal.classList.add('show'); modal.style.display='grid';
     document.documentElement.setAttribute('data-checkout-open','1'); document.body.style.overflow='hidden';
     setStep(1); startStock();
-    if (!__px.atc){ __px.atc = true; fbq('AddToCart', pixelCartData({ value: (qty||1) * PRICE })); }
+    if (!__px.atc){ __px.atc = true; pixel.track('AddToCart', pixelCartData({ value: (qty||1) * PRICE })); }
   };
   window.checkoutClose = function(){ 
     modal.classList.remove('show'); modal.style.display='none';
@@ -244,7 +244,7 @@
             });
             const d = await resp.json().catch(()=>null);
             if (!resp.ok || !d?.hosted_url) throw new Error(d?.error || `Charge creation failed (HTTP ${resp.status})`);
-            fbq('AddPaymentInfo', pixelCartData({ payment_method: 'crypto' }));
+            pixel.track('AddPaymentInfo', pixelCartData({ payment_method: 'crypto' }));
             window.location.href = d.hosted_url;
           } catch (err) {
             alert(err?.message || 'Crypto checkout failed');
@@ -259,7 +259,7 @@
           sessionStorage.setItem('coLastTotal', String(t.total));
           sessionStorage.setItem('coLastQty', String(qty));
           sessionStorage.setItem('coLastOrderId', orderId);
-          fbq('AddPaymentInfo', pixelCartData({ payment_method: 'cashapp' }));
+          pixel.track('AddPaymentInfo', pixelCartData({ payment_method: 'cashapp' }));
           const cashUrl = `https://cash.app/$${cashtag}?amount=${encodeURIComponent(t.total.toFixed(2))}&note=${encodeURIComponent(orderId)}`;
           window.open(cashUrl,'_blank','noopener');
         }
